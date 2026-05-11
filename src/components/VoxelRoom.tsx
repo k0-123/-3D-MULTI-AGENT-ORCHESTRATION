@@ -1,7 +1,7 @@
 import { DESKS } from "@/store/useAgentStore";
 
 export function VoxelRoom() {
-  const tiles: JSX.Element[] = [];
+  const tiles: React.ReactElement[] = [];
   const size = 24;
   for (let x = -size / 2; x < size / 2; x++) {
     for (let z = -size / 2; z < size / 2; z++) {
