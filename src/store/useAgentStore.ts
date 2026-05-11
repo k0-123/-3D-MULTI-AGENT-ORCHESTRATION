@@ -1,7 +1,8 @@
 import { create } from "zustand";
 
-export type AgentStatus = "idle" | "moving" | "working" | "meeting";
+export type AgentStatus = "idle" | "moving" | "working" | "learning";
 export type Vec3 = [number, number, number];
+export type TimeOfDay = "day" | "night";
 
 export interface Agent {
   id: string;
@@ -9,93 +10,150 @@ export interface Agent {
   role: string;
   color: string;
   status: AgentStatus;
-  current_location: Vec3;
-  target_location: Vec3;
+  position: Vec3;
+  targetPosition: Vec3;
+  personaPrompt: string;
+  mcpTools: string[];
+  knowledgeBase: string[];
+  workstation: Vec3;
+  sparkleAt?: number;
 }
 
 export interface LogEntry {
   id: string;
-  ts: number;
-  kind: "mcp" | "dialogue" | "system";
-  who?: string;
-  text: string;
+  timestamp: number;
+  message: string;
+  type: "info" | "system" | "mcp";
 }
 
-// Fixed coordinates
-export const DESKS: Record<string, Vec3> = {
-  "Desk 1": [-8, 0, -6],
-  "Desk 2": [-8, 0, 0],
-  "Desk 3": [-8, 0, 6],
-  "Desk 4": [8, 0, -6],
-  "Desk 5": [8, 0, 0],
-  "Desk 6": [8, 0, 6],
-};
-export const MEETING_HUB: Vec3 = [0, 0, 0];
-
-// Meeting seat positions around the hub
-export const MEETING_SEATS: Vec3[] = [
-  [-2.5, 0, -2.5],
-  [2.5, 0, -2.5],
-  [-2.5, 0, 2.5],
-  [2.5, 0, 2.5],
-  [0, 0, -3.5],
-  [0, 0, 3.5],
+// Outdoor workstations scattered around the data hub
+export const WORKSTATIONS: Vec3[] = [
+  [-10, 0, -8],
+  [-12, 0, 4],
+  [-6, 0, 10],
+  [10, 0, -8],
+  [12, 0, 4],
+  [6, 0, 10],
 ];
 
-const initialAgents: Agent[] = [
-  { id: "ceo", name: "Tony", role: "CEO", color: "#f5c542", status: "idle", current_location: DESKS["Desk 1"], target_location: DESKS["Desk 1"] },
-  { id: "arch", name: "Alex", role: "Architect", color: "#42a5f5", status: "idle", current_location: DESKS["Desk 2"], target_location: DESKS["Desk 2"] },
-  { id: "rain", name: "Jordan", role: "Rainmaker", color: "#66bb6a", status: "idle", current_location: DESKS["Desk 3"], target_location: DESKS["Desk 3"] },
-  { id: "growth", name: "Gary", role: "Growth", color: "#ef5350", status: "idle", current_location: DESKS["Desk 4"], target_location: DESKS["Desk 4"] },
-  { id: "funnel", name: "Russell", role: "Funnel", color: "#ab47bc", status: "idle", current_location: DESKS["Desk 5"], target_location: DESKS["Desk 5"] },
-  { id: "ops", name: "Seth", role: "Ops", color: "#26c6da", status: "idle", current_location: DESKS["Desk 6"], target_location: DESKS["Desk 6"] },
+export const DATA_HUB: Vec3 = [0, 0, 0];
+
+// Positions agents take around the hub when learning at night
+export const HUB_RING: Vec3[] = [
+  [-3, 0, -3],
+  [3, 0, -3],
+  [-4, 0, 0],
+  [4, 0, 0],
+  [-3, 0, 3],
+  [3, 0, 3],
 ];
+
+const baseAgents = [
+  { id: "ceo", name: "Karan", role: "CEO", color: "#f5c542" },
+  { id: "senior", name: "Senior Builder", role: "Full Stack", color: "#42a5f5" },
+  { id: "intern", name: "Intern Builder", role: "Full Stack", color: "#80deea" },
+  { id: "offer", name: "Offer Architect", role: "Strategy", color: "#ab47bc" },
+  { id: "growth", name: "Growth Hacker", role: "Growth", color: "#ef5350" },
+  { id: "funnel", name: "Funnel Engineer", role: "Funnel", color: "#66bb6a" },
+];
+
+const initialAgents: Agent[] = baseAgents.map((b, i) => ({
+  ...b,
+  status: "idle" as AgentStatus,
+  position: WORKSTATIONS[i],
+  targetPosition: WORKSTATIONS[i],
+  workstation: WORKSTATIONS[i],
+  personaPrompt: `You are ${b.name}, the ${b.role}. Operate with precision and proactivity.`,
+  mcpTools: ["Web Search"],
+  knowledgeBase: ["framework.pdf", "playbook.md"],
+}));
 
 interface AgentStore {
+  timeOfDay: TimeOfDay;
+  activeModalAgentId: string | null;
   agents: Agent[];
   logs: LogEntry[];
-  setAgentStatus: (id: string, status: AgentStatus) => void;
-  setAgentTarget: (id: string, target: Vec3) => void;
-  setAgentLocation: (id: string, loc: Vec3) => void;
-  log: (entry: Omit<LogEntry, "id" | "ts">) => void;
-  runMission: (mission: string) => void;
+  setTarget: (id: string, coords: Vec3) => void;
+  setStatus: (id: string, status: AgentStatus) => void;
+  setPosition: (id: string, coords: Vec3) => void;
+  toggleTimeOfDay: () => void;
+  updateAgentConfig: (id: string, config: Partial<Agent>) => void;
+  setActiveModalAgent: (id: string | null) => void;
+  addLog: (message: string, type?: LogEntry["type"]) => void;
 }
 
+const makeLog = (message: string, type: LogEntry["type"] = "info"): LogEntry => ({
+  id: Math.random().toString(36).slice(2),
+  timestamp: 0, // hydration-safe; rendered as relative
+  message,
+  type,
+});
+
 export const useAgentStore = create<AgentStore>((set, get) => ({
+  timeOfDay: "day",
+  activeModalAgentId: null,
   agents: initialAgents,
   logs: [
-    { id: "boot", ts: Date.now(), kind: "system", text: "MCP Orchestrator online. 6 agents registered." },
+    makeLog("MCP Orchestrator online. 6 agents registered.", "system"),
+    makeLog("Daylight protocol active. Agents at workstations.", "info"),
   ],
-  setAgentStatus: (id, status) =>
-    set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, status } : a)) })),
-  setAgentTarget: (id, target) =>
-    set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, target_location: target, status: "moving" } : a)) })),
-  setAgentLocation: (id, loc) =>
-    set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, current_location: loc } : a)) })),
-  log: (entry) =>
+  setTarget: (id, coords) =>
     set((s) => ({
-      logs: [...s.logs, { ...entry, id: Math.random().toString(36).slice(2), ts: Date.now() }].slice(-200),
+      agents: s.agents.map((a) =>
+        a.id === id ? { ...a, targetPosition: coords, status: "moving" } : a,
+      ),
     })),
-  runMission: (mission) => {
-    const { log, setAgentTarget, setAgentStatus } = get();
-    log({ kind: "system", text: `> Mission received: "${mission}"` });
-    log({ kind: "mcp", who: "MCP", text: "tool.invoke → ceo.analyze_mission()" });
-    log({ kind: "dialogue", who: "Tony (CEO)", text: "CEO analyzing mission." });
-
-    setAgentTarget("ceo", DESKS["Desk 1"]);
-
-    setTimeout(() => {
-      log({ kind: "dialogue", who: "Tony (CEO)", text: "CEO calling meeting." });
-      log({ kind: "mcp", who: "MCP", text: "tool.invoke → orchestrator.summon(['ceo','arch','ops'])" });
-      setAgentTarget("ceo", MEETING_SEATS[0]);
-      setAgentTarget("arch", MEETING_SEATS[1]);
-      setAgentTarget("ops", MEETING_SEATS[2]);
-    }, 2000);
-
-    setTimeout(() => {
-      const ids = ["ceo", "arch", "ops"];
-      ids.forEach((id) => setAgentStatus(id, "meeting"));
-      log({ kind: "system", text: "Meeting in session at Central Hub." });
-    }, 6500);
+  setStatus: (id, status) =>
+    set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, status } : a)) })),
+  setPosition: (id, coords) =>
+    set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, position: coords } : a)) })),
+  toggleTimeOfDay: () => {
+    const { timeOfDay, addLog, agents } = get();
+    const next: TimeOfDay = timeOfDay === "day" ? "night" : "day";
+    set({ timeOfDay: next });
+    if (next === "night") {
+      addLog("Sunsetting daily operations. Karan: Initiating nighttime optimization protocol.", "system");
+      agents.forEach((a, i) => {
+        set((s) => ({
+          agents: s.agents.map((x) =>
+            x.id === a.id ? { ...x, targetPosition: HUB_RING[i], status: "moving" } : x,
+          ),
+        }));
+      });
+      // After arrival, mark as learning + inject feedback logs
+      setTimeout(() => {
+        get().agents.forEach((a) => get().setStatus(a.id, "learning"));
+        addLog("Cross-referencing daily actions with ingested Knowledge Base.", "system");
+      }, 4500);
+      setTimeout(() => {
+        addLog("Growth Hacker: updating strategy weights based on 'youtube_transcript_01.txt'.", "mcp");
+      }, 6000);
+      setTimeout(() => {
+        addLog("Funnel Engineer: re-indexing conversion graph from 'analytics_q3.csv'.", "mcp");
+      }, 7500);
+    } else {
+      addLog("Sunrise. Agents returning to workstations.", "system");
+      get().agents.forEach((a) => {
+        set((s) => ({
+          agents: s.agents.map((x) =>
+            x.id === a.id ? { ...x, targetPosition: x.workstation, status: "moving" } : x,
+          ),
+        }));
+      });
+    }
   },
+  updateAgentConfig: (id, config) => {
+    set((s) => ({
+      agents: s.agents.map((a) =>
+        a.id === id ? { ...a, ...config, sparkleAt: Date.now() } : a,
+      ),
+    }));
+    const agent = get().agents.find((a) => a.id === id);
+    if (agent) get().addLog(`Updated neural weights for ${agent.name}.`, "system");
+  },
+  setActiveModalAgent: (id) => set({ activeModalAgentId: id }),
+  addLog: (message, type = "info") =>
+    set((s) => ({
+      logs: [...s.logs, { id: Math.random().toString(36).slice(2), timestamp: Date.now(), message, type }].slice(-200),
+    })),
 }));

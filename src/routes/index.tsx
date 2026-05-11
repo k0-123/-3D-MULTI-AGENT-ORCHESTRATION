@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Scene } from "@/components/Scene";
-import { DashboardOverlay } from "@/components/DashboardOverlay";
+import { Scene } from "@/components/3d/Scene";
+import { DashboardOverlay } from "@/components/ui/DashboardOverlay";
 
 export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
       { title: "MCP · 3D Multi-Agent Orchestration" },
-      { name: "description", content: "Voxel-style multi-agent orchestration platform with articulated Minecraft-like characters." },
+      { name: "description", content: "Voxel multi-agent orchestration platform with day/night learning cycle and per-agent MCP configuration." },
     ],
   }),
 });
