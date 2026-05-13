@@ -1,4 +1,4 @@
-import { useAgentStore } from "@/store/useAgentStore";
+import { useAgentStore } from "../../store/useAgentStore";
 import { X, Send, User, Code, Zap, Palette, Terminal, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -10,7 +10,7 @@ export function AgentOverlay() {
   const [isThinking, setIsThinking] = useState(false);
   const [chat, setChat] = useState<{role: 'agent'|'user', content: string}[]>([]);
 
-  const agent = agents.find((a) => a.id === activeId);
+  const agent = activeId ? agents[activeId] : null;
   
   useEffect(() => {
     if (agent) {

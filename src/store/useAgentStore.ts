@@ -16,6 +16,10 @@ export interface Agent {
   mcpTools: string[];
   knowledgeBase: string[];
   workstation: Vec3;
+  currentTask?: string | null;
+  lastResult?: string | null;
+  speechBubble?: string | null;
+  tasksCompleted?: number;
   sparkleAt?: number;
 }
 
@@ -71,6 +75,10 @@ const initialAgents: Agent[] = baseAgents.map((b, i) => ({
   personaPrompt: `You are ${b.name}, the ${b.role}. Operate with precision and proactivity.`,
   mcpTools: ["Web Search"],
   knowledgeBase: ["framework.pdf", "playbook.md"],
+  currentTask: null,
+  lastResult: null,
+  speechBubble: null,
+  tasksCompleted: 0,
 }));
 
 interface AgentStore {

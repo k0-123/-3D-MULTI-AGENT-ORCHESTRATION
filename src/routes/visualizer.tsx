@@ -1,6 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { AgentHUD } from "@/components/AgentHUD";
+import { useAgentStore } from "@/store/useAgentStore";
 
 // Lazy load the Scene to avoid top-level SSR issues with Three.js
 const Scene = lazy(() => import("@/components/3d/Scene").then(m => ({ default: m.Scene })));
@@ -36,6 +38,8 @@ function Visualizer() {
         <Scene />
       </Suspense>
 
+      <AgentHUD />
+
       {/* Floating Back Button */}
       <div className="pointer-events-none fixed inset-0 z-50 p-6">
         <Link
@@ -46,6 +50,7 @@ function Visualizer() {
           Back to Dashboard
         </Link>
       </div>
+
 
       {/* Camera Control Guide */}
       <div className="pointer-events-none fixed bottom-6 left-6 z-50">
