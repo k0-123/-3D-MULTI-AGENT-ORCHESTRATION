@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Scene } from "@/components/3d/Scene";
 import { DashboardOverlay } from "@/components/ui/DashboardOverlay";
 
 export const Route = createFileRoute("/")({
@@ -15,7 +14,6 @@ export const Route = createFileRoute("/")({
 function Index() {
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#0b0e16]">
-      <Scene />
       <DashboardOverlay />
     </main>
   );

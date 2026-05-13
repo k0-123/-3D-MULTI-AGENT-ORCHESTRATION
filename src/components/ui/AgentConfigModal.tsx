@@ -35,11 +35,10 @@ export function AgentConfigModal() {
     <AnimatePresence>
       {agent && (
         <motion.div
-          initial={{ x: "100%", opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: "100%", opacity: 0 }}
-          transition={{ type: "spring", damping: 26, stiffness: 220 }}
-          className="pointer-events-auto absolute right-4 top-20 bottom-56 z-30 flex w-[420px] flex-col rounded-2xl border border-white/10 bg-black/60 p-5 backdrop-blur-xl shadow-2xl"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className="pointer-events-auto fixed inset-0 m-auto z-50 flex h-fit w-[480px] flex-col rounded-2xl border border-white/10 bg-[#0b0e16] p-8 shadow-[0_0_100px_rgba(0,0,0,0.8)]"
         >
           <div className="flex items-start justify-between">
             <div>
