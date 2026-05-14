@@ -8,6 +8,8 @@ import { retrieveMemory, storeMemory } from "./memory";
 
 import { DESIGN_SYSTEMS } from "../design-systems";
 import { composePromptStack } from "../../prompts/composer";
+import { getHtmlPrompt, getTokensForSystem } from "../../prompts/html-template";
+import { FEW_SHOT_EXAMPLES } from "../../prompts/few-shots";
 
 console.log("[Graph] Environment Check:", {
   hasGroq: !!process.env.GROQ_API_KEY,
@@ -168,10 +170,11 @@ interface RoadmapStep {
   task: string;
   status: "pending" | "completed" | "rejected";
   tools?: string[];
-  skillId?: string; // Phase 2: Specific skill assigned to this step
-  group?: string;   // Phase 6.5: "A", "B", "C" (parallel execution)
-  reviewRequired?: boolean; // Phase 6.5: Skip review if false
-  complexity?: "fast" | "deep"; // Phase 6.5: Model tier
+  skillId?: string;                          // Phase 2: Specific skill assigned to this step
+  group?: string;                            // Phase 6.5: "A", "B", "C" (parallel execution)
+  reviewRequired?: boolean;                  // Phase 6.5: Skip review if false
+  complexity?: "fast" | "deep";              // Phase 6.5: Model tier
+  outputFormat?: "text" | "markdown" | "html"; // Phase 3: Deliverable format
 }
 
 const AgentState = Annotation.Root({
@@ -217,20 +220,29 @@ async function resilientInvoke(
   for (const { name, fn } of attempts) {
     const model = fn();
     if (!model) continue;
+    
+    let timeoutId: NodeJS.Timeout | undefined;
     try {
       console.log(`[Graph] Invoking ${name}...`);
-      // Add a timeout to the invoke call
+      
       const response = await Promise.race([
         model.invoke(messages),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timeout after 90s`)), 90000))
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error(`${name} timeout after 90s`));
+          }, 90000);
+        })
       ]) as any;
+      
+      if (timeoutId) clearTimeout(timeoutId);
       
       const content = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
       const tokenCost = (content.length / 4) * 0.000000075;
       console.log(`[Graph] ${name} success.`);
       return { content, tokenCost };
     } catch (err) {
-      console.warn(`[Invoke] ${name} failed: ${err}`);
+      if (timeoutId) clearTimeout(timeoutId);
+      console.warn(`[Invoke] ${name} failed: ${err || "Unknown error"}`);
     }
   }
   throw new Error("All LLM attempts failed.");
@@ -280,9 +292,18 @@ OPEN DESIGN PROTOCOL (ACTIVE):
 1. Pick the best DESIGN SYSTEM from the index below that fits the user's request.
 2. For each step, assign a specific SKILL ID if appropriate.
 3. If the task is a presentation, pitch deck, or weekly report, use the "deck_master" agent.
-4. PARALLEL OPTIMIZATION: Assign each step a "group" (A, B, C). Steps in the same group run in parallel. 
+4. PARALLEL RULES (MANDATORY):
+   - If 2+ steps do NOT depend on each other's output -> SAME GROUP.
+   - Research/Analysis/Writing steps should almost always be Group A (parallel).
+   - Only use Group B/C if the step literally NEEDS a previous group's output.
+   - Example: Research + Copy = Group A (parallel), Build Page = Group B (needs A).
 5. SPEED: Assign "complexity" (fast or deep). Use "fast" for research/simple tasks.
 6. REVIEW: Set "review: no" for internal research steps to save time.
+7. OUTPUT FORMAT (MANDATORY):
+   - For "build/create a page/website/landing/dashboard/app/tool" → FORMAT: html
+   - For "write/create a slide deck/presentation/pitch deck" → FORMAT: html
+   - For "research/analyze/plan/strategy/docs/report" → FORMAT: markdown
+   - For everything else → FORMAT: markdown
 
 DESIGN SYSTEM INDEX (pick one):
 ${dsIndex.split("\n").slice(0, 100).join("\n")} ... (truncated)
@@ -301,8 +322,9 @@ ${webResearch ? `RESEARCH CONTEXT (use this to inform your roadmap):\n${webResea
 
 Respond with EXACTLY this format and NOTHING else:
 ${state.useOpenDesign ? "DESIGN_SYSTEM: [id from index]\n" : ""}ROADMAP:
-1. [agentId]: [clear task description] ${state.useOpenDesign ? "(SKILL: skill-id, GROUP: A, COMPLEXITY: fast/deep, REVIEW: yes/no)" : ""}
+1. [agentId]: [clear task description] ${state.useOpenDesign ? "(SKILL: skill-id, GROUP: A, COMPLEXITY: fast/deep, REVIEW: yes/no, FORMAT: html/markdown)" : ""}
 TOOLS: [none or comma-separated: search, github:list, github:read, github:commit]`;
+
 
   const { content, tokenCost } = await resilientInvoke([
     new SystemMessage(systemPrompt),
@@ -322,18 +344,26 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
       const idPart = parts[0].replace(/^\d+\.\s*/, "").toLowerCase().trim();
       const taskWithSkill = parts.slice(1).join(":").trim();
       
-      // Extract Phase 6.5 metadata: "(SKILL: saas-landing, GROUP: A, COMPLEXITY: fast, REVIEW: no)"
+      // Extract Phase 6.5 metadata: "(SKILL: saas-landing, GROUP: A, COMPLEXITY: fast, REVIEW: no, FORMAT: html)"
       const skillMatch = taskWithSkill.match(/\(SKILL:\s*([\w-]+)/i);
       const groupMatch = taskWithSkill.match(/GROUP:\s*([\w-]+)/i);
       const complexityMatch = taskWithSkill.match(/COMPLEXITY:\s*(fast|deep)/i);
       const reviewMatch = taskWithSkill.match(/REVIEW:\s*(yes|no)/i);
+      const formatMatch = taskWithSkill.match(/FORMAT:\s*(html|markdown|text)/i);
       
       const skillId = skillMatch ? skillMatch[1].trim() : undefined;
       const group = groupMatch ? groupMatch[1].trim() : "A";
       const complexity = (complexityMatch ? complexityMatch[1].trim() : "deep") as "fast" | "deep";
       const reviewRequired = reviewMatch ? reviewMatch[1].trim() === "yes" : true;
+      const outputFormat = formatMatch ? formatMatch[1].trim() as "html" | "markdown" | "text" : "markdown";
       
-      const taskPart = taskWithSkill.replace(/\(SKILL:.*?\)/i, "").replace(/\(GROUP:.*?\)/i, "").replace(/\(COMPLEXITY:.*?\)/i, "").replace(/\(REVIEW:.*?\)/i, "").trim();
+      const taskPart = taskWithSkill
+        .replace(/\(SKILL:.*?\)/i, "")
+        .replace(/\(GROUP:.*?\)/i, "")
+        .replace(/\(COMPLEXITY:.*?\)/i, "")
+        .replace(/\(REVIEW:.*?\)/i, "")
+        .replace(/\(FORMAT:.*?\)/i, "")
+        .trim();
 
       const validIds = ["ceo", "senior", "intern", "offer", "growth", "funnel", "designer", "deck_master"];
       const validId = validIds.includes(idPart) ? idPart : "senior";
@@ -345,7 +375,8 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
         skillId, 
         group, 
         complexity, 
-        reviewRequired 
+        reviewRequired,
+        outputFormat,
       } as RoadmapStep;
     })
     .filter((s): s is RoadmapStep => !!s && s.task.length > 2);
@@ -371,11 +402,21 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
   const currentStep = state.roadmap[state.currentStepIndex];
   if (!currentStep) return { error: "No step found" };
 
-  // Phase 6.5: Parallel Execution
-  // Find all steps in the same group starting from current index
-  const groupSteps = state.useOpenDesign
+  // Phase 5: Parallel Execution Fallback
+  let groupSteps = state.useOpenDesign
     ? state.roadmap.slice(state.currentStepIndex).filter(s => s.group === currentStep.group)
     : [currentStep];
+
+  // Auto-grouping fallback: If CEO put everything in Group A and there are 3+ steps, auto-split
+  if (state.useOpenDesign && currentStep.group === "A" && state.roadmap.length >= 3 && state.currentStepIndex === 0) {
+    const allInA = state.roadmap.every(s => s.group === "A");
+    if (allInA) {
+      console.log("[BatchWorker] CEO failed to parallelize. Applying auto-split fallback.");
+      const mid = Math.ceil(state.roadmap.length / 2);
+      // We'll just execute the first half as group A this time
+      groupSteps = state.roadmap.slice(0, mid);
+    }
+  }
 
   console.log(`[BatchWorker] Executing group ${currentStep.group || 'A'} (${groupSteps.length} agents)`);
 
@@ -399,6 +440,15 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
       searchContext = await tavilySearch(step.task);
     }
 
+    // 1.5 Phase 6: Memory Retrieval
+    let historicalContext = "";
+    if (state.useOpenDesign) {
+      const memories = await retrieveMemory(step.task, step.agentId);
+      if (memories.length > 0) {
+        historicalContext = `\n\nHISTORICAL LEARNINGS FROM PAST SUCCESSFUL TASKS:\n${memories.join("\n")}\n`;
+      }
+    }
+
     // 2. Phase 6: Context Sharing (All approved previous steps)
     const previousResults = Object.entries(state.stepResults)
       .map(([idx, res]) => `STEP ${Number(idx) + 1} RESULT: ${res.slice(0, 1000)}`)
@@ -406,23 +456,37 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
 
     // 3. Phase 3: Enhanced Prompt Stack
     let systemPrompt = "";
-    if (state.useOpenDesign) {
+    const isHtml = step.outputFormat === "html";
+
+    if (isHtml) {
+      // HTML generation path — both Open Design and standard
+      const tokens = getTokensForSystem(state.activeDesignSystem);
+      systemPrompt = getHtmlPrompt(tokens, step.task);
+    } else if (state.useOpenDesign) {
+      const fewShot = FEW_SHOT_EXAMPLES[step.agentId] || "";
       systemPrompt = await composePromptStack({
         designSystemId: state.activeDesignSystem || undefined,
         skillId: step.skillId,
         agentPersona: `You are ${step.agentId}, a specialist on a professional team.`,
-        taskContext: `YOUR TASK: ${step.task}\n\n${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n\n` : ""}${state.reviewFeedback ? "REVISION NOTES FROM CEO: " + state.reviewFeedback : ""}\n${githubContext ? "GITHUB DATA:\n" + githubContext : ""}\n${searchContext ? "SEARCH RESULTS:\n" + searchContext : ""}
+        taskContext: `YOUR TASK: ${step.task}\n\n${fewShot ? `EXAMPLE OF PERFECT WORK BY YOU:\n${fewShot}\n\n` : ""}${historicalContext}${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n\n` : ""}${state.reviewFeedback ? "REVISION NOTES FROM CEO: " + state.reviewFeedback : ""}\n${githubContext ? "GITHUB DATA:\n" + githubContext : ""}\n${searchContext ? "SEARCH RESULTS:\n" + searchContext : ""}
 
 OUTPUT FORMAT RULES:
 - Respond with EXACTLY this format:
 ACTION: [one sentence describing what you did]
 RESULT:
-[Use RICH MARKDOWN: ## headers, **bold** key terms, - bullet lists, > blockquotes for callouts, \`\`\`language code blocks, | table | headers | for data, --- between major sections. NO plain paragraphs without structure.]`
+[Use RICH MARKDOWN: ## headers, **bold** key terms, - bullet lists, > blockquotes for callouts, \`\`\`language code blocks, | table | headers | for data, --- between major sections.
+- VISUAL ASSETS: Use ![description](https://images.unsplash.com/photo-...) for relevant images.
+- NO plain paragraphs without structure.]`
       });
     } else {
+      const fewShot = FEW_SHOT_EXAMPLES[step.agentId] || "";
       systemPrompt = `You are ${step.agentId}, a specialist on a professional team.
 
 YOUR TASK: ${step.task}
+
+${fewShot ? `EXAMPLE OF PERFECT WORK BY YOU:\n${fewShot}\n` : ""}
+
+${historicalContext}
 
 ${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n` : ""}
 
@@ -442,6 +506,7 @@ RESULT:
 - \`\`\`language for code blocks (always specify language)
 - | col1 | col2 | col3 | tables for any comparative data
 - --- horizontal rules between major sections
+- VISUAL ASSETS: Use ![description](https://images.unsplash.com/photo-...) for relevant images.
 NEVER write unstructured plain paragraphs. Every response must have at least 2 structural elements (headers, tables, or lists).]`;
     }
 
@@ -550,6 +615,14 @@ FEEDBACK: [One sentence on what to change if rejected]`;
   const newRoadmap = [...state.roadmap];
   if (isApproved) {
     groupSteps.forEach((_, i) => { newRoadmap[state.currentStepIndex + i].status = "completed"; });
+    // Phase 6: Store approved work in memory
+    if (state.useOpenDesign) {
+      const combinedTask = groupSteps.map(s => s.task).join(" | ");
+      const combinedAgents = groupSteps.map(s => s.agentId).join("+");
+      await storeMemory(state.workerOutput, combinedAgents, combinedTask).catch(err => {
+        console.error("[Graph] Memory storage failed:", err);
+      });
+    }
   } else {
     groupSteps.forEach((_, i) => { newRoadmap[state.currentStepIndex + i].status = "rejected"; });
   }
@@ -587,13 +660,19 @@ export function routeAfterWorker(state: AgentStateType) {
   const currentStep = state.roadmap[state.currentStepIndex];
   if (!currentStep) return "end";
 
-  // Phase 6.5: Skip review if any step in group says reviewRequired: false
-  // Actually, if ANY step in the group requires review, we go to review.
+  // Phase 5: Skip review if any step in group says reviewRequired: false
+  // Aggressive skipping for research tasks
   const groupSteps = state.useOpenDesign
     ? state.roadmap.slice(state.currentStepIndex).filter(s => s.group === currentStep.group)
     : [currentStep];
 
-  const anyReviewNeeded = groupSteps.some(s => s.reviewRequired !== false);
+  const anyReviewNeeded = groupSteps.some(s => {
+    // Auto-skip review for research/analysis tasks to save time
+    const isResearch = /research|analyze|find|list|search/i.test(s.task);
+    if (isResearch && s.reviewRequired !== true) return false; 
+    return s.reviewRequired !== false;
+  });
+  
   return anyReviewNeeded ? "review" : "advance";
 }
 

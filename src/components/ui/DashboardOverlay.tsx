@@ -467,15 +467,19 @@ TASK: ${newIssuePrompt}`;
                                    )}
                                    <button 
                                      onClick={() => {
-                                       const blob = new Blob([del.content], { type: 'text/markdown' });
+                                       const isHtml = del.content.includes('<!DOCTYPE html>') || del.content.includes('<html');
+                                       const ext = isHtml ? 'html' : 'md';
+                                       const mime = isHtml ? 'text/html' : 'text/markdown';
+                                       const blob = new Blob([del.content], { type: mime });
                                        const url = URL.createObjectURL(blob);
                                        const a = document.createElement('a');
                                        a.href = url;
-                                       a.download = `deliverable-${del.agentId}-${del.id.slice(0,5)}.md`;
+                                       a.download = `${del.agentId}-${del.id.slice(0,5)}.${ext}`;
                                        a.click();
+                                       URL.revokeObjectURL(url);
                                      }}
                                      className="p-2 rounded-xl bg-white/5 text-white/20 hover:text-cyan-400 transition"
-                                     title="Export Result"
+                                     title={`Export as ${del.content.includes('<!DOCTYPE html>') || del.content.includes('<html') ? '.html' : '.md'}`}
                                    >
                                      <Download size={16} />
                                    </button>
