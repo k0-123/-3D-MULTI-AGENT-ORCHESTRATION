@@ -411,7 +411,13 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
         designSystemId: state.activeDesignSystem || undefined,
         skillId: step.skillId,
         agentPersona: `You are ${step.agentId}, a specialist on a professional team.`,
-        taskContext: `YOUR TASK: ${step.task}\n\n${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n\n` : ""}${state.reviewFeedback ? "REVISION NOTES FROM CEO: " + state.reviewFeedback : ""}\n${githubContext ? "GITHUB DATA:\n" + githubContext : ""}\n${searchContext ? "SEARCH RESULTS:\n" + searchContext : ""}`
+        taskContext: `YOUR TASK: ${step.task}\n\n${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n\n` : ""}${state.reviewFeedback ? "REVISION NOTES FROM CEO: " + state.reviewFeedback : ""}\n${githubContext ? "GITHUB DATA:\n" + githubContext : ""}\n${searchContext ? "SEARCH RESULTS:\n" + searchContext : ""}
+
+OUTPUT FORMAT RULES:
+- Respond with EXACTLY this format:
+ACTION: [one sentence describing what you did]
+RESULT:
+[Use RICH MARKDOWN: ## headers, **bold** key terms, - bullet lists, > blockquotes for callouts, \`\`\`language code blocks, | table | headers | for data, --- between major sections. NO plain paragraphs without structure.]`
       });
     } else {
       systemPrompt = `You are ${step.agentId}, a specialist on a professional team.
@@ -421,13 +427,22 @@ YOUR TASK: ${step.task}
 ${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n` : ""}
 
 CRITICAL RULES:
-1. Respond ONLY in plain text. No XML/JSON tags.
+1. Respond ONLY in Markdown. No XML/JSON tags.
 2. Stay STRICTLY on topic.
-3. Be concise but complete.
+3. Be concise but thorough. Use structure — never write wall-of-text paragraphs.
 
 Respond with EXACTLY this format:
 ACTION: [one sentence describing what you did]
-RESULT: [your complete, direct answer to the task]`;
+RESULT:
+[Use RICH MARKDOWN formatting:
+- ## for section headers
+- **bold** for key terms and emphasis
+- - bullet lists and 1. numbered lists
+- > blockquotes for important callouts and warnings
+- \`\`\`language for code blocks (always specify language)
+- | col1 | col2 | col3 | tables for any comparative data
+- --- horizontal rules between major sections
+NEVER write unstructured plain paragraphs. Every response must have at least 2 structural elements (headers, tables, or lists).]`;
     }
 
     // 4. Phase 6.5: Model Routing by Complexity
