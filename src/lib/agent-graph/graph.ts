@@ -6,7 +6,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { retrieveMemory, storeMemory } from "./memory";
 
-import { getDesignSystemIndex } from "../design-systems";
+import { DESIGN_SYSTEMS } from "../design-systems";
 import { composePromptStack } from "../../prompts/composer";
 
 console.log("[Graph] Environment Check:", {
@@ -263,7 +263,7 @@ async function ceoNode(state: AgentStateType): Promise<Partial<AgentStateType>> 
     webResearch = await tavilySearch(state.task);
   }
 
-  const dsIndex = getDesignSystemIndex();
+  const dsIndex = Object.keys(DESIGN_SYSTEMS).join("\n");
   
   const systemPrompt = `You are Karan, CEO of a multi-agent team. Your ONLY job is to create a roadmap.
 
@@ -515,7 +515,7 @@ CRITIQUE DIMENSIONS:
 2. PROSE QUALITY: Is it free of "AI Slop"? (Check IDENTITY_CHARTER rules).
 3. TECHNICAL CORRECTNESS: Is the information accurate?
 4. BREVITY: Is it concise and direct?
-5. SKILL EXECUTION: Did it follow the assigned ${step.skillId || 'General'} skill rules?
+5. SKILL EXECUTION: Did it follow the assigned ${groupSteps.map(s => s.skillId).filter(Boolean).join(", ") || 'General'} skill rules?
 ` : "Evaluate if the work matches the task directly."}
 
 Respond with EXACTLY:
