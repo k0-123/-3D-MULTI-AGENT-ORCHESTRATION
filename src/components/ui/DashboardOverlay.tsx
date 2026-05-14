@@ -25,10 +25,12 @@ import {
   Terminal,
   FileText,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Palette // kept for potential future use
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useAgentStore } from "@/store/useAgentStore";
+// Design store removed — agents pick design systems autonomously
 import { AgentConfigModal } from "./AgentConfigModal";
 import { PaperclipDashboard } from "./PaperclipDashboard";
 import { Onboarding } from "./Onboarding";
@@ -57,8 +59,12 @@ export function DashboardOverlay() {
     setUserId,
     fetchInitialData,
     userId,
-    roadmap
+    roadmap,
+    useOpenDesign,
+    toggleOpenDesign
   } = useAgentStore();
+
+
 
   const [activeSection, setActiveSection] = useState<"dashboard" | "inbox" | "issues" | "results" | "goals" | "routines">("dashboard");
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -126,6 +132,7 @@ export function DashboardOverlay() {
       setHasNewResults(false);
     }
   }, [deliverables.length, activeSection]);
+
 
   if (!isMounted || loading) return null;
 
@@ -263,6 +270,25 @@ export function DashboardOverlay() {
             </div>
           </div>
         </nav>
+
+        {/* Open Design: Agent Intelligence Toggle */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between px-2">
+            <div className="flex items-center gap-2">
+              <Palette size={12} className="text-white/30" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Open Design</span>
+            </div>
+            <button 
+              onClick={toggleOpenDesign}
+              className={`h-5 w-10 rounded-full p-1 transition-colors ${useOpenDesign ? "bg-cyan-500" : "bg-white/10"}`}
+            >
+              <div className={`h-3 w-3 rounded-full bg-black transition-transform ${useOpenDesign ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          {useOpenDesign && (
+            <p className="mt-2 px-2 text-[9px] text-white/20 leading-relaxed">Agents will autonomously select design systems and apply brand-grade styling to their outputs.</p>
+          )}
+        </div>
 
         <div className="mt-4 space-y-2 border-t border-white/5 pt-4">
           <button onClick={toggleTimeOfDay} className="flex w-full items-center justify-between rounded-xl bg-white/[0.03] p-3 transition hover:bg-white/[0.06]">
