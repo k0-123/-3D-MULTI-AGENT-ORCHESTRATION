@@ -130,6 +130,8 @@ interface AgentStore {
   toggleGoal: (id: string) => void;
   addRoutine: (routine: any) => void;
   removeRoutine: (id: string) => void;
+  useOpenDesign: boolean;
+  toggleOpenDesign: () => void;
 }
 
 const makeLog = (message: string, type: LogEntry["type"] = "info"): LogEntry => ({
@@ -200,6 +202,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   toggleGoal: (id) => set((s) => ({ companyGoals: s.companyGoals.map(g => g.id === id ? { ...g, status: g.status === "completed" ? "pending" : "completed" } : g) })),
   addRoutine: (routine) => set((s) => ({ routines: [...s.routines, { ...routine, id: Math.random().toString(36).slice(2) }] })),
   removeRoutine: (id) => set((s) => ({ routines: s.routines.filter(r => r.id !== id) })),
+  useOpenDesign: false,
+  toggleOpenDesign: () => set((s) => ({ useOpenDesign: !s.useOpenDesign })),
   addDeliverable: (deliverable) => set((s) => {
     // Prevent duplicates by content hash or ID
     const exists = s.deliverables.some(d => d.id === deliverable.id || (d.content === deliverable.content && d.issueId === deliverable.issueId));
