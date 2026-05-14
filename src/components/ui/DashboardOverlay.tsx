@@ -1,36 +1,13 @@
 import { useEffect, useState } from "react";
 import { 
-  Sun, 
-  Moon, 
-  Activity, 
-  LayoutDashboard, 
-  ListTodo, 
-  Inbox, 
-  Target,
-  Send,
-  Plus,
-  Eye,
-  Box,
-  ChevronRight,
-  Zap,
-  CheckCircle2,
-  XCircle,
-  UserPlus,
-  Search,
-  Trash2,
-  AlertTriangle,
-  GripVertical,
-  Filter,
-  ArrowRight,
-  Terminal,
-  FileText,
-  Clock,
-  ExternalLink,
-  Palette // kept for potential future use
-} from "lucide-react";
+  Sun, Moon, Activity, LayoutDashboard, ListTodo, Inbox, Target, Send, Plus, Eye, Box, ChevronRight, Zap, 
+  CheckCircle2, XCircle, UserPlus, Search, Trash2, AlertTriangle, GripVertical, Filter, ArrowRight, 
+  Terminal, FileText, Clock, ShieldCheck, ExternalLink, Download, Layout, Info, Palette
+} from 'lucide-react';
+import { ArtifactPreview } from './ArtifactPreview';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { Link } from "@tanstack/react-router";
 import { useAgentStore } from "@/store/useAgentStore";
-// Design store removed — agents pick design systems autonomously
 import { AgentConfigModal } from "./AgentConfigModal";
 import { PaperclipDashboard } from "./PaperclipDashboard";
 import { Onboarding } from "./Onboarding";
@@ -80,6 +57,8 @@ export function DashboardOverlay() {
   
   // Routine Modal State
   const [showNewRoutineModal, setShowNewRoutineModal] = useState(false);
+  const [showDiscovery, setShowDiscovery] = useState(false);
+  const [brief, setBrief] = useState({ audience: '', tone: '', fidelity: 'High (Brand Grade)', surface: '' });
   const [routineTitle, setRoutineTitle] = useState("");
   const [routineInstructions, setRoutineInstructions] = useState("");
 
@@ -143,9 +122,21 @@ export function DashboardOverlay() {
   const handleCreateIssue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newIssuePrompt.trim()) return;
-    const prompt = newIssuePrompt;
+    
+    let prompt = newIssuePrompt;
+    if (showDiscovery) {
+      prompt = `MISSION BRIEF:
+Audience: ${brief.audience || 'General'}
+Tone: ${brief.tone || 'Professional'}
+Fidelity: ${brief.fidelity}
+Surface: ${brief.surface || 'Digital'}
+
+TASK: ${newIssuePrompt}`;
+    }
+
     setNewIssuePrompt("");
     setShowNewIssueModal(false);
+    setShowDiscovery(false);
     await runOrchestration(prompt);
   };
 
@@ -474,14 +465,47 @@ export function DashboardOverlay() {
                                        <ArrowRight size={14} /> Open Task
                                      </button>
                                    )}
-                                   <button className="p-2 rounded-xl bg-white/5 text-white/20 hover:text-white transition">
-                                     <ExternalLink size={16} />
+                                   <button 
+                                     onClick={() => {
+                                       const blob = new Blob([del.content], { type: 'text/markdown' });
+                                       const url = URL.createObjectURL(blob);
+                                       const a = document.createElement('a');
+                                       a.href = url;
+                                       a.download = `deliverable-${del.agentId}-${del.id.slice(0,5)}.md`;
+                                       a.click();
+                                     }}
+                                     className="p-2 rounded-xl bg-white/5 text-white/20 hover:text-cyan-400 transition"
+                                     title="Export Result"
+                                   >
+                                     <Download size={16} />
                                    </button>
                                 </div>
                              </div>
-                             <div className="p-10 font-mono text-sm leading-relaxed text-white/80 whitespace-pre-wrap bg-black/20">
-                               {del.content}
-                             </div>
+                                 <div className="flex flex-col gap-6">
+                                   {(del.content.includes('<!DOCTYPE html>') || del.content.includes('<html')) ? (
+                                     <div className="h-[500px] w-full">
+                                       <ArtifactPreview content={del.content} type="html" />
+                                     </div>
+                                   ) : (
+                                     <MarkdownRenderer content={del.content} />
+                                   )}
+                                 </div>
+                             {del.auditLog && del.auditLog.length > 0 && (
+                               <div className="border-t border-white/5 bg-white/[0.01] px-10 py-6">
+                                 <div className="flex items-center gap-3 mb-4">
+                                   <ShieldCheck size={14} className="text-emerald-500" />
+                                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500/50">Quality Audit Report</span>
+                                 </div>
+                                 <div className="grid grid-cols-1 gap-2">
+                                   {del.auditLog.map((log, idx) => (
+                                     <div key={idx} className="flex items-start gap-3 rounded-lg bg-white/[0.02] p-3 border border-white/5">
+                                       <div className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${log.includes('APPROVED') ? 'bg-emerald-500' : (log.includes('REJECTED') ? 'bg-rose-500' : 'bg-white/20')}`} />
+                                       <p className="text-[11px] text-white/40 leading-relaxed font-medium">{log}</p>
+                                     </div>
+                                   ))}
+                                 </div>
+                               </div>
+                             )}
                           </div>
                          );
                        })
@@ -725,9 +749,43 @@ export function DashboardOverlay() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0f121a] p-8 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">New Mission Assignment</h3>
-              <span className="text-[8px] font-black uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-full border border-cyan-500/20">Advanced Mode</span>
+              <div className="flex flex-col">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">New Mission Assignment</h3>
+                <span className="text-[8px] font-black uppercase tracking-widest text-cyan-400 mt-1">Open Design Intelligence: ON</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowDiscovery(prev => !prev)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition text-[9px] font-black uppercase tracking-wider ${showDiscovery ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+              >
+                <Zap size={10} /> {showDiscovery ? 'Hide Brief' : 'Add Brief'}
+              </button>
             </div>
+
+            {showDiscovery && (
+              <div className="mb-6 grid grid-cols-2 gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-white/20">Audience</label>
+                  <input type="text" placeholder="e.g. Investors" value={brief.audience} onChange={e => setBrief({...brief, audience: e.target.value})} className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-cyan-500/30" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-white/20">Tone</label>
+                  <input type="text" placeholder="e.g. Futuristic" value={brief.tone} onChange={e => setBrief({...brief, tone: e.target.value})} className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-cyan-500/30" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-white/20">Fidelity</label>
+                  <select value={brief.fidelity} onChange={e => setBrief({...brief, fidelity: e.target.value})} className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-1.5 text-[10px] text-white outline-none">
+                    <option>High (Brand Grade)</option>
+                    <option>Medium (Functional)</option>
+                    <option>Low (Wireframe)</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[8px] font-black uppercase tracking-widest text-white/20">Surface</label>
+                  <input type="text" placeholder="e.g. Desktop Web" value={brief.surface} onChange={e => setBrief({...brief, surface: e.target.value})} className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-cyan-500/30" />
+                </div>
+              </div>
+            )}
             <form onSubmit={handleCreateIssue} className="space-y-6">
               <div className="space-y-4">
                 <textarea autoFocus value={newIssuePrompt} onChange={(e) => setNewIssuePrompt(e.target.value)} placeholder="Describe the mission goal..." className="w-full h-32 rounded-xl bg-black/40 border border-white/10 p-4 text-sm text-white focus:border-cyan-500/50 outline-none" />

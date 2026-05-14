@@ -118,8 +118,8 @@ interface AgentStore {
   requestHire: (role: string, color: string) => void;
   resolveInboxItem: (id: string) => void;
   hireAgent: (metadata: { role: string; color: string }) => void;
-  deliverables: { id: string; agentId: string; issueId?: string; content: string; timestamp: number }[];
-  addDeliverable: (deliverable: { id: string; agentId: string; issueId?: string; content: string; timestamp: number }) => void;
+  deliverables: { id: string; agentId: string; issueId?: string; content: string; timestamp: number; auditLog?: string[] }[];
+  addDeliverable: (deliverable: { id: string; agentId: string; issueId?: string; content: string; timestamp: number; auditLog?: string[] }) => void;
   resolveDeliverable: (id: string) => void;
   clearDeliverables: () => void;
   clearAllIssues: () => void;
@@ -469,6 +469,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
                   issueId: id,
                   content: data.result,
                   timestamp: Date.now(),
+                  auditLog: data.auditLog || [],
                 };
                 
                 get().addDeliverable(deliverable);

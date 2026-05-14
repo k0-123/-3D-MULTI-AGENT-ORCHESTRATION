@@ -169,6 +169,9 @@ interface RoadmapStep {
   status: "pending" | "completed" | "rejected";
   tools?: string[];
   skillId?: string; // Phase 2: Specific skill assigned to this step
+  group?: string;   // Phase 6.5: "A", "B", "C" (parallel execution)
+  reviewRequired?: boolean; // Phase 6.5: Skip review if false
+  complexity?: "fast" | "deep"; // Phase 6.5: Model tier
 }
 
 const AgentState = Annotation.Root({
@@ -187,6 +190,7 @@ const AgentState = Annotation.Root({
   error: Annotation<string | null>({ reducer: (_, b) => b, default: () => null }),
   useOpenDesign: Annotation<boolean>({ reducer: (_, b) => b, default: () => false }),
   activeDesignSystem: Annotation<string | null>({ reducer: (_, b) => b, default: () => null }),
+  stepResults: Annotation<Record<string, string>>({ reducer: (a, b) => ({ ...a, ...b }), default: () => ({}) }),
 });
 
 type AgentStateType = typeof AgentState.State;
@@ -276,9 +280,12 @@ OPEN DESIGN PROTOCOL (ACTIVE):
 1. Pick the best DESIGN SYSTEM from the index below that fits the user's request.
 2. For each step, assign a specific SKILL ID if appropriate.
 3. If the task is a presentation, pitch deck, or weekly report, use the "deck_master" agent.
+4. PARALLEL OPTIMIZATION: Assign each step a "group" (A, B, C). Steps in the same group run in parallel. 
+5. SPEED: Assign "complexity" (fast or deep). Use "fast" for research/simple tasks.
+6. REVIEW: Set "review: no" for internal research steps to save time.
 
 DESIGN SYSTEM INDEX (pick one):
-\${dsIndex.split("\\n").slice(0, 100).join("\\n")} ... (truncated)
+${dsIndex.split("\n").slice(0, 100).join("\n")} ... (truncated)
 ` : ""}
 
 Available Agents:
@@ -294,7 +301,7 @@ ${webResearch ? `RESEARCH CONTEXT (use this to inform your roadmap):\n${webResea
 
 Respond with EXACTLY this format and NOTHING else:
 ${state.useOpenDesign ? "DESIGN_SYSTEM: [id from index]\n" : ""}ROADMAP:
-1. [agentId]: [clear task description] \${state.useOpenDesign ? "(SKILL: skill-id)" : ""}
+1. [agentId]: [clear task description] ${state.useOpenDesign ? "(SKILL: skill-id, GROUP: A, COMPLEXITY: fast/deep, REVIEW: yes/no)" : ""}
 TOOLS: [none or comma-separated: search, github:list, github:read, github:commit]`;
 
   const { content, tokenCost } = await resilientInvoke([
@@ -315,15 +322,31 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
       const idPart = parts[0].replace(/^\d+\.\s*/, "").toLowerCase().trim();
       const taskWithSkill = parts.slice(1).join(":").trim();
       
-      // Extract Skill ID if present: "Task description (SKILL: saas-landing)"
-      const skillMatch = taskWithSkill.match(/\(SKILL:\s*([\w-]+)\)/i);
+      // Extract Phase 6.5 metadata: "(SKILL: saas-landing, GROUP: A, COMPLEXITY: fast, REVIEW: no)"
+      const skillMatch = taskWithSkill.match(/\(SKILL:\s*([\w-]+)/i);
+      const groupMatch = taskWithSkill.match(/GROUP:\s*([\w-]+)/i);
+      const complexityMatch = taskWithSkill.match(/COMPLEXITY:\s*(fast|deep)/i);
+      const reviewMatch = taskWithSkill.match(/REVIEW:\s*(yes|no)/i);
+      
       const skillId = skillMatch ? skillMatch[1].trim() : undefined;
-      const taskPart = taskWithSkill.replace(/\(SKILL:.*?\)/i, "").trim();
+      const group = groupMatch ? groupMatch[1].trim() : "A";
+      const complexity = (complexityMatch ? complexityMatch[1].trim() : "deep") as "fast" | "deep";
+      const reviewRequired = reviewMatch ? reviewMatch[1].trim() === "yes" : true;
+      
+      const taskPart = taskWithSkill.replace(/\(SKILL:.*?\)/i, "").replace(/\(GROUP:.*?\)/i, "").replace(/\(COMPLEXITY:.*?\)/i, "").replace(/\(REVIEW:.*?\)/i, "").trim();
 
       const validIds = ["ceo", "senior", "intern", "offer", "growth", "funnel", "designer", "deck_master"];
       const validId = validIds.includes(idPart) ? idPart : "senior";
       
-      return { agentId: validId, task: taskPart, status: "pending" as const, skillId } as RoadmapStep;
+      return { 
+        agentId: validId, 
+        task: taskPart, 
+        status: "pending" as const, 
+        skillId, 
+        group, 
+        complexity, 
+        reviewRequired 
+      } as RoadmapStep;
     })
     .filter((s): s is RoadmapStep => !!s && s.task.length > 2);
 
@@ -341,108 +364,125 @@ TOOLS: [none or comma-separated: search, github:list, github:read, github:commit
     currentStepIndex: 0,
     activeDesignSystem,
     budget: { ...state.budget, spent: state.budget.spent + tokenCost },
-    auditLog: [audit("ceo", `Roadmap created: ${roadmap.length} steps. \${activeDesignSystem ? "Design Style: " + activeDesignSystem : ""}`)],
-    agentUpdates: [{ agentId: "ceo", newStatus: "working", actionLog: activeDesignSystem ? `Selected Design System: \${activeDesignSystem}` : "Mission Roadmap Designed." }],
+    auditLog: [audit("ceo", `Roadmap created: ${roadmap.length} steps. ${activeDesignSystem ? "Design Style: " + activeDesignSystem : ""}`)],
+    agentUpdates: [{ agentId: "ceo", newStatus: "working", actionLog: activeDesignSystem ? `Selected Design System: ${activeDesignSystem}` : "Mission Roadmap Designed." }],
   };
-}
+}async function workerNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
+  const currentStep = state.roadmap[state.currentStepIndex];
+  if (!currentStep) return { error: "No step found" };
 
-async function workerNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
-  const step = state.roadmap[state.currentStepIndex];
-  if (!step) return { error: "No step found" };
+  // Phase 6.5: Parallel Execution
+  // Find all steps in the same group starting from current index
+  const groupSteps = state.useOpenDesign
+    ? state.roadmap.slice(state.currentStepIndex).filter(s => s.group === currentStep.group)
+    : [currentStep];
 
-  // Check for GitHub tools in step
-  let githubContext = "";
-  if (step.agentId === "senior") {
-    if (step.task.toLowerCase().includes("list files")) {
-      githubContext = await githubAction("list", {});
-    } else if (step.task.toLowerCase().includes("read file")) {
-      const path = step.task.match(/read file ([\w./-]+)/)?.[1];
-      if (path) githubContext = await githubAction("read", { path });
+  console.log(`[BatchWorker] Executing group ${currentStep.group || 'A'} (${groupSteps.length} agents)`);
+
+  const executions = await Promise.all(groupSteps.map(async (step, offset) => {
+    const stepIdx = state.currentStepIndex + offset;
+    
+    // 1. Tool Context (GitHub/Search)
+    let githubContext = "";
+    if (step.agentId === "senior") {
+      if (step.task.toLowerCase().includes("list files")) {
+        githubContext = await githubAction("list", {});
+      } else if (step.task.toLowerCase().includes("read file")) {
+        const path = step.task.match(/read file ([\w./-]+)/)?.[1];
+        if (path) githubContext = await githubAction("read", { path });
+      }
     }
-  }
 
-  // Check for search tools
-  let searchContext = "";
-  if (step.task.toLowerCase().includes("search") || step.task.toLowerCase().includes("research") ||
-      step.task.toLowerCase().includes("who is") || step.task.toLowerCase().includes("what is") ||
-      step.task.toLowerCase().includes("find") || step.task.toLowerCase().includes("current")) {
-    searchContext = await tavilySearch(step.task);
-  }
+    let searchContext = "";
+    if (step.task.toLowerCase().includes("search") || step.task.toLowerCase().includes("research") ||
+        step.task.toLowerCase().includes("find")) {
+      searchContext = await tavilySearch(step.task);
+    }
 
-  // Phase 3: Enhanced Prompt Stack
-  let systemPrompt = "";
-  if (state.useOpenDesign) {
-    systemPrompt = await composePromptStack({
-      designSystemId: state.activeDesignSystem || undefined,
-      skillId: step.skillId,
-      agentPersona: `You are \${step.agentId}, a specialist on a professional team.`,
-      taskContext: `YOUR TASK: \${step.task}\n\n\${state.reviewFeedback ? \`REVISION NOTES FROM CEO: \${state.reviewFeedback}\` : ""}\n\${githubContext ? \`GITHUB DATA:\\n\${githubContext}\` : ""}\n\${searchContext ? \`SEARCH RESULTS:\\n\${searchContext}\` : ""}`
-    });
-  } else {
-    systemPrompt = `You are \${step.agentId}, a specialist on a professional team.
+    // 2. Phase 6: Context Sharing (All approved previous steps)
+    const previousResults = Object.entries(state.stepResults)
+      .map(([idx, res]) => `STEP ${Number(idx) + 1} RESULT: ${res.slice(0, 1000)}`)
+      .join("\n\n");
 
-YOUR TASK: \${step.task}
+    // 3. Phase 3: Enhanced Prompt Stack
+    let systemPrompt = "";
+    if (state.useOpenDesign) {
+      systemPrompt = await composePromptStack({
+        designSystemId: state.activeDesignSystem || undefined,
+        skillId: step.skillId,
+        agentPersona: `You are ${step.agentId}, a specialist on a professional team.`,
+        taskContext: `YOUR TASK: ${step.task}\n\n${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n\n` : ""}${state.reviewFeedback ? "REVISION NOTES FROM CEO: " + state.reviewFeedback : ""}\n${githubContext ? "GITHUB DATA:\n" + githubContext : ""}\n${searchContext ? "SEARCH RESULTS:\n" + searchContext : ""}`
+      });
+    } else {
+      systemPrompt = `You are ${step.agentId}, a specialist on a professional team.
 
-CRITICAL RULES — VIOLATION MEANS FAILURE:
-1. Respond ONLY in plain text. No XML, no JSON, no HTML, no markup of any kind.
-2. Do NOT output <tool_call>, <invoke>, <minimax:tool_call>, or ANY XML tags. These are FORBIDDEN.
-3. Do NOT hallucinate tools or APIs. You have NO tools. Just answer directly.
-4. Stay STRICTLY on topic. Answer ONLY what is asked.
-5. Be concise but complete. Give the actual answer, not meta-commentary.
+YOUR TASK: ${step.task}
 
-\${state.reviewFeedback ? `REVISION NOTES FROM CEO: \${state.reviewFeedback}` : ""}
-\${githubContext ? `GITHUB DATA:\n\${githubContext}` : ""}
-\${searchContext ? `SEARCH RESULTS:\n\${searchContext}` : ""}
+${previousResults ? `PREVIOUS WORK CONTEXT:\n${previousResults}\n` : ""}
+
+CRITICAL RULES:
+1. Respond ONLY in plain text. No XML/JSON tags.
+2. Stay STRICTLY on topic.
+3. Be concise but complete.
 
 Respond with EXACTLY this format:
 ACTION: [one sentence describing what you did]
 RESULT: [your complete, direct answer to the task]`;
-  }
-
-  const { content, tokenCost } = await resilientInvoke([
-    new SystemMessage(systemPrompt),
-    new HumanMessage(`Complete this task now: ${step.task}`),
-  ], state, "minimax");
-
-  // Sanitize the response to remove any model artifacts
-  const sanitized = sanitizeResponse(content);
-  console.log("[Worker] Raw:", content.slice(0, 200));
-  console.log("[Worker] Sanitized:", sanitized.slice(0, 200));
-
-  if (sanitized.includes("GITHUB_ACTION: commit")) {
-    const path = sanitized.match(/PATH:\s*(.+)/)?.[1]?.trim();
-    const message = sanitized.match(/MESSAGE:\s*(.+)/)?.[1]?.trim();
-    const fileContent = sanitized.match(/CONTENT:\s*([\s\S]+)/)?.[1]?.trim();
-
-    if (path && fileContent) {
-      const result = await githubAction("commit", { path, message, content: fileContent });
-      return {
-        workerOutput: result,
-        budget: { ...state.budget, spent: state.budget.spent + tokenCost },
-        auditLog: [audit(step.agentId, "Committed changes to GitHub: " + path)],
-        agentUpdates: [{ agentId: step.agentId, newStatus: "working", actionLog: "GitHub Commit Executed." }],
-      };
     }
-  }
 
-  const action = sanitized.match(/ACTION:\s*([\s\S]+?)(?=RESULT:|$)/i)?.[1]?.trim() ?? "Task complete.";
-  let result = sanitized.match(/RESULT:\s*([\s\S]+)$/i)?.[1]?.trim() ?? sanitized;
+    // 4. Phase 6.5: Model Routing by Complexity
+    const preferredModel = step.complexity === "fast" ? "glm" : "minimax";
 
-  // Final safety net: if result still contains tool call artifacts, strip them
-  result = sanitizeResponse(result);
+    const { content, tokenCost } = await resilientInvoke([
+      new SystemMessage(systemPrompt),
+      new HumanMessage(`Complete this task now: ${step.task}`),
+    ], state, preferredModel);
+
+    const sanitized = sanitizeResponse(content);
+    let action = sanitized.match(/ACTION:\s*([\s\S]+?)(?=RESULT:|$)/i)?.[1]?.trim() ?? "Task complete.";
+    let result = sanitized.match(/RESULT:\s*([\s\S]+)$/i)?.[1]?.trim() ?? sanitized;
+    result = sanitizeResponse(result);
+
+    // Handle internal tool triggers
+    if (sanitized.includes("GITHUB_ACTION: commit")) {
+      const path = sanitized.match(/PATH:\s*(.+)/)?.[1]?.trim();
+      const msg = sanitized.match(/MESSAGE:\s*(.+)/)?.[1]?.trim();
+      const fileContent = sanitized.match(/CONTENT:\s*([\s\S]+)/)?.[1]?.trim();
+      if (path && fileContent) {
+        const ghRes = await githubAction("commit", { path, message: msg, content: fileContent });
+        result = ghRes;
+        action = `Committed to GitHub: ${path}`;
+      }
+    }
+
+    return { stepIdx, agentId: step.agentId, action, result, tokenCost };
+  }));
+
+  // Aggregate results for state update
+  const totalCost = executions.reduce((sum, e) => sum + e.tokenCost, 0);
+  const combinedOutput = executions.map(e => `[${e.agentId.toUpperCase()}]: ${e.result}`).join("\n\n---\n\n");
+  const newStepResults = { ...state.stepResults };
+  executions.forEach(e => { newStepResults[e.stepIdx] = e.result; });
+
+  const auditLogs = executions.map(e => audit(e.agentId, e.action));
+  const agentUpdates = executions.map(e => ({ agentId: e.agentId, newStatus: "working" as const, actionLog: e.action }));
 
   return {
-    workerOutput: result,
-    budget: { ...state.budget, spent: state.budget.spent + tokenCost },
-    auditLog: [audit(step.agentId, action)],
-    agentUpdates: [{ agentId: step.agentId, newStatus: "working", actionLog: action }],
-    result: result,
-    messages: [new HumanMessage(`${step.agentId}: ${action}`)],
+    workerOutput: combinedOutput,
+    budget: { ...state.budget, spent: state.budget.spent + totalCost },
+    auditLog: auditLogs,
+    agentUpdates: agentUpdates,
+    result: combinedOutput,
+    stepResults: newStepResults,
+    // Note: We don't increment currentStepIndex here yet because we need to handle potential rejection of the group
   };
 }
 
 async function reviewNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
-  const step = state.roadmap[state.currentStepIndex];
+  const currentStep = state.roadmap[state.currentStepIndex];
+  const groupSteps = state.useOpenDesign
+    ? state.roadmap.slice(state.currentStepIndex).filter(s => s.group === currentStep.group)
+    : [currentStep];
 
   // Quick-reject: if worker output is mostly XML/tool calls, auto-reject
   const xmlRatio = (state.workerOutput.match(/<[^>]+>/g) || []).length;
@@ -454,23 +494,28 @@ async function reviewNode(state: AgentStateType): Promise<Partial<AgentStateType
       reviewFeedback: "Your response contained XML/tool_call tags. Respond in PLAIN TEXT only. No XML, no JSON, no tool calls.",
       currentStepIndex: state.currentStepIndex,
       retryCount: state.retryCount + 1,
-      auditLog: [audit("ceo", `Review for \${step.agentId}: ❌ AUTO-REJECTED (XML artifacts detected)`)],
+      auditLog: [audit("ceo", `Review for group ${currentStep.group || 'A'}: ❌ AUTO-REJECTED (XML artifacts detected)`)],
       agentUpdates: [{ agentId: "ceo", newStatus: "reviewing", actionLog: "Auto-rejected: XML in output." }],
     };
   }
 
   const systemPrompt = `You are Karan, CEO. Perform a 5-DIMENSIONAL CRITIQUE of this work.
+  
+THIS IS A BATCH OF WORK FROM ${groupSteps.length} AGENTS: ${groupSteps.map(s => s.agentId).join(", ")}
 
-ORIGINAL TASK: \${step.task}
-WORKER OUTPUT: \${state.workerOutput}
+ORIGINAL TASKS:
+${groupSteps.map((s, i) => `${i+1}. [${s.agentId}]: ${s.task}`).join("\n")}
+
+WORKER OUTPUT:
+${state.workerOutput}
 
 ${state.useOpenDesign ? `
 CRITIQUE DIMENSIONS:
-1. BRAND ALIGNMENT: Does it follow the selected \${state.activeDesignSystem || 'Global'} design system?
+1. BRAND ALIGNMENT: Does it follow the selected ${state.activeDesignSystem || 'Global'} design system?
 2. PROSE QUALITY: Is it free of "AI Slop"? (Check IDENTITY_CHARTER rules).
 3. TECHNICAL CORRECTNESS: Is the information accurate?
 4. BREVITY: Is it concise and direct?
-5. SKILL EXECUTION: Did it follow the assigned \${step.skillId || 'General'} skill rules?
+5. SKILL EXECUTION: Did it follow the assigned ${step.skillId || 'General'} skill rules?
 ` : "Evaluate if the work matches the task directly."}
 
 Respond with EXACTLY:
@@ -480,7 +525,7 @@ FEEDBACK: [One sentence on what to change if rejected]`;
 
   const { content, tokenCost } = await resilientInvoke([
     new SystemMessage(systemPrompt),
-    new HumanMessage(`Review work from \${step.agentId}`),
+    new HumanMessage(`Review work from ${groupSteps.map(s => s.agentId).join(", ")}`),
   ], state, "glm");
 
   const sanitized = sanitizeResponse(content);
@@ -489,25 +534,56 @@ FEEDBACK: [One sentence on what to change if rejected]`;
 
   const newRoadmap = [...state.roadmap];
   if (isApproved) {
-    newRoadmap[state.currentStepIndex].status = "completed";
+    groupSteps.forEach((_, i) => { newRoadmap[state.currentStepIndex + i].status = "completed"; });
   } else {
-    newRoadmap[state.currentStepIndex].status = "rejected";
+    groupSteps.forEach((_, i) => { newRoadmap[state.currentStepIndex + i].status = "rejected"; });
   }
 
   return {
     roadmap: newRoadmap,
     reviewFeedback: isApproved ? null : feedback,
-    currentStepIndex: isApproved ? state.currentStepIndex + 1 : state.currentStepIndex,
+    currentStepIndex: isApproved ? state.currentStepIndex + groupSteps.length : state.currentStepIndex,
     retryCount: isApproved ? 0 : state.retryCount + 1,
-    auditLog: [audit("ceo", `Review for \${step.agentId}: \${isApproved ? "✅ APPROVED" : "❌ REJECTED"}`)],
-    agentUpdates: [{ agentId: "ceo", newStatus: "reviewing", actionLog: isApproved ? "Work validated." : `Revision requested: \${feedback.slice(0, 50)}...` }],
+    auditLog: [audit("ceo", `Review for group ${currentStep.group || 'A'}: ${isApproved ? "✅ APPROVED" : "❌ REJECTED"}`)],
+    agentUpdates: [{ agentId: "ceo", newStatus: "reviewing", actionLog: isApproved ? "Work validated." : `Revision requested: ${feedback.slice(0, 50)}...` }],
     result: isApproved ? state.workerOutput : state.result,
     budget: { ...state.budget, spent: state.budget.spent + tokenCost },
   };
 }
 
+async function advanceNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
+  const currentStep = state.roadmap[state.currentStepIndex];
+  const groupSteps = state.useOpenDesign
+    ? state.roadmap.slice(state.currentStepIndex).filter(s => s.group === currentStep.group)
+    : [currentStep];
 
-function routeAfterReview(state: AgentStateType) {
+  const newRoadmap = [...state.roadmap];
+  groupSteps.forEach((_, i) => { newRoadmap[state.currentStepIndex + i].status = "completed"; });
+
+  return {
+    roadmap: newRoadmap,
+    currentStepIndex: state.currentStepIndex + groupSteps.length,
+    auditLog: [audit("ceo", `Group ${currentStep.group || 'A'} marked as complete (Review Skipped).`)],
+    agentUpdates: [{ agentId: "ceo", newStatus: "reviewing", actionLog: "Advancing to next phase." }],
+  };
+}
+
+export function routeAfterWorker(state: AgentStateType) {
+  const currentStep = state.roadmap[state.currentStepIndex];
+  if (!currentStep) return "end";
+
+  // Phase 6.5: Skip review if any step in group says reviewRequired: false
+  // Actually, if ANY step in the group requires review, we go to review.
+  const groupSteps = state.useOpenDesign
+    ? state.roadmap.slice(state.currentStepIndex).filter(s => s.group === currentStep.group)
+    : [currentStep];
+
+  const anyReviewNeeded = groupSteps.some(s => s.reviewRequired !== false);
+  return anyReviewNeeded ? "review" : "advance";
+}
+
+
+export function routeAfterReview(state: AgentStateType) {
   // If rejected, allow up to 2 retries then force-advance
   if (state.reviewFeedback) {
     if (state.retryCount >= 2) {
@@ -524,9 +600,15 @@ const workflow = new StateGraph(AgentState)
   .addNode("ceo", ceoNode)
   .addNode("worker", workerNode)
   .addNode("review", reviewNode)
+  .addNode("advance", advanceNode)
   .addEdge(START, "ceo")
   .addEdge("ceo", "worker")
-  .addEdge("worker", "review")
+  .addConditionalEdges("worker", routeAfterWorker, {
+    review: "review",
+    advance: "advance",
+    end: END
+  })
+  .addEdge("advance", "worker") // Loops back to check if more steps exist
   .addConditionalEdges("review", routeAfterReview, {
     worker: "worker",
     end: END,
@@ -545,7 +627,7 @@ export async function* runAgentStream(task: string, goal?: string, env?: any, us
   const initial = {
     task: goal ? `Goal: ${goal}\n\nTask: ${task}` : task,
     messages: [],
-    auditLog: [`[SYSTEM] Multi-Step Orchestrator active. Goal: \${goal || 'Complete task'}. \${useOpenDesign ? '(Open Design Intelligence: ON)' : ''}`],
+    auditLog: [`[SYSTEM] Multi-Step Orchestrator active. Goal: ${goal || 'Complete task'}. ${useOpenDesign ? '(Open Design Intelligence: ON)' : ''}`],
     agentUpdates: [],
     budget: { limit: 10.0, spent: 0.0 },
     roadmap: [],
