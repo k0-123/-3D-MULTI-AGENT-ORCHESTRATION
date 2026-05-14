@@ -64,6 +64,7 @@ const baseAgents = [
   { id: "growth", name: "Growth Hacker", role: "Growth", color: "#ef5350" },
   { id: "funnel", name: "Funnel Engineer", role: "Funnel", color: "#66bb6a" },
   { id: "designer", name: "Visual Designer", role: "Design", color: "#ec4899" },
+  { id: "deck_master", name: "Deck Master", role: "Presentation", color: "#f97316" },
 ];
 
 const initialAgents: Agent[] = baseAgents.map((b, i) => ({
@@ -409,7 +410,12 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       const response = await fetch("/api/orchestrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, currentGoal: get().currentGoal, issueId: id }),
+        body: JSON.stringify({ 
+          prompt, 
+          currentGoal: get().currentGoal, 
+          issueId: id,
+          useOpenDesign: get().useOpenDesign 
+        }),
       });
 
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
