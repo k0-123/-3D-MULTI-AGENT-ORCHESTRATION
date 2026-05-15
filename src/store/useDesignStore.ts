@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { parseDesignMd, DesignTokens, tokensToCssVars } from "../lib/design-systems/parser";
+import { parseDesignMd, DesignTokens, tokensToCssVars } from "@repo/design-systems";
 
 interface DesignStore {
   activeSystem: string;

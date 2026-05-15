@@ -1,6 +1,6 @@
 import { IDENTITY_CHARTER } from "./identity";
-import { loadSkill, stripFrontmatter } from "../lib/skills/loader";
-import { parseDesignMd } from "../lib/design-systems/parser";
+import { loadSkill, stripFrontmatter } from "@repo/skills";
+import { parseDesignMd } from "@repo/design-systems";
 import { readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
