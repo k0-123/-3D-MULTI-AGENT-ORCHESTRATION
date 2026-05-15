@@ -14,9 +14,16 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/shared": "*",
-    "@repo/design-systems": "*",
-    "@repo/skills": "*"
+    "@repo/shared": "workspace:*",
+    "@repo/design-systems": "workspace:*",
+    "@repo/skills": "workspace:*",
+    "@langchain/core": "^1.1.45",
+    "@langchain/google-genai": "^2.1.30",
+    "@langchain/groq": "^1.2.0",
+    "@langchain/langgraph": "^1.3.0",
+    "@langchain/openai": "^1.4.5",
+    "@octokit/rest": "^22.0.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
