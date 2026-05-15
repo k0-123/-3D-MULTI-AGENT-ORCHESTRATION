@@ -34,5 +34,8 @@ dist-ssr
 # Environment variables
 .env
 
+# Turborepo
+.turbo/
+
 # Temporary files
 scratch/
