@@ -2,7 +2,7 @@ import { defineEventHandler, setResponseHeaders, readBody, createError, createEv
 import { runAgentStream } from "../lib/agent-graph/graph";
 import { runNightCycle, getMorningBriefing } from "../lib/agent-graph/memory";
 
-const AGENT_IDS = ["ceo", "senior", "intern", "offer", "growth", "funnel"];
+import { AGENT_IDS } from "@repo/shared";
 
 export async function handleOrchestrateRequest(request: Request, env?: any): Promise<Response> {
   const { readable, writable } = new TransformStream();

@@ -11,6 +11,15 @@ import { composePromptStack } from "../../prompts/composer";
 import { getHtmlPrompt, getTokensForSystem } from "../../prompts/html-template";
 import { FEW_SHOT_EXAMPLES } from "../../prompts/few-shots";
 
+import { 
+  Issue, 
+  AgentUpdate, 
+  Budget, 
+  RoadmapStep, 
+  audit, 
+  sanitizeResponse 
+} from "@repo/shared";
+
 console.log("[Graph] Environment Check:", {
   hasGroq: !!process.env.GROQ_API_KEY,
   hasGemini: !!process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -150,32 +159,7 @@ async function tavilySearch(query: string): Promise<string> {
   }
 }
 
-interface Issue {
-  id: string; title: string;
-  status: 'todo' | 'in_progress' | 'completed' | 'blocked';
-  assignee: string;
-  priority: 'low' | 'medium' | 'high';
-}
-
-interface AgentUpdate {
-  agentId: string;
-  newStatus: "idle" | "working" | "moving" | "learning" | "reviewing";
-  actionLog: string;
-}
-
-interface Budget { limit: number; spent: number; }
-
-interface RoadmapStep {
-  agentId: string;
-  task: string;
-  status: "pending" | "completed" | "rejected";
-  tools?: string[];
-  skillId?: string;                          // Phase 2: Specific skill assigned to this step
-  group?: string;                            // Phase 6.5: "A", "B", "C" (parallel execution)
-  reviewRequired?: boolean;                  // Phase 6.5: Skip review if false
-  complexity?: "fast" | "deep";              // Phase 6.5: Model tier
-  outputFormat?: "text" | "markdown" | "html"; // Phase 3: Deliverable format
-}
+// Shared types migrated to @repo/shared
 
 const AgentState = Annotation.Root({
   task: Annotation<string>(),
@@ -248,20 +232,7 @@ async function resilientInvoke(
   throw new Error("All LLM attempts failed.");
 }
 
-function audit(agentId: string, msg: string): string {
-  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
-  return `[${ts}] [${agentId.toUpperCase()}] ${msg}`;
-}
-
-// Strips model-specific artifacts (MiniMax tool_call XML, JSON blobs, etc.) from LLM output
-function sanitizeResponse(raw: string): string {
-  let cleaned = raw;
-  // Remove MiniMax tool_call XML blocks
-  cleaned = cleaned.replace(/<minimax:tool_call>[\s\S]*?<\/minimax:tool_call>/g, "").trim();
-  // Remove any generic XML tool invocations
-  cleaned = cleaned.replace(/<invoke[\s\S]*?<\/invoke>/g, "").trim();
-  // Remove JSON blobs that look like tool parameters ({"QUERY":..., "MAX_RESULTS":...})
-  cleaned = cleaned.replace(/^\s*\{["'](?:QUERY|query|MAX_RESULTS|max_results)["'][\s\S]*?\}\s*/gm, "").trim();
+// Utilities migrated to @repo/shared
   // Remove lines that are only whitespace after cleanup
   cleaned = cleaned.split("\n").filter(l => l.trim().length > 0).join("\n");
   return cleaned || raw; // fallback to raw if everything got stripped

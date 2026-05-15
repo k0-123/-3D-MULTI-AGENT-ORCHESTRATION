@@ -1,73 +1,18 @@
 import { create } from "zustand";
+import { 
+  AgentStatus, 
+  Vec3, 
+  TimeOfDay, 
+  Agent, 
+  LogEntry, 
+  Issue,
+  WORKSTATIONS, 
+  DATA_HUB, 
+  HUB_RING, 
+  BASE_AGENTS 
+} from "@repo/shared";
 
-export type AgentStatus = "idle" | "moving" | "working" | "learning" | "reviewing";
-export type Vec3 = [number, number, number];
-export type TimeOfDay = "day" | "night";
-
-export interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  color: string;
-  status: AgentStatus;
-  position: Vec3;
-  targetPosition: Vec3;
-  personaPrompt: string;
-  mcpTools: string[];
-  knowledgeBase: string[];
-  workstation: Vec3;
-  currentTask?: string | null;
-  lastResult?: string | null;
-  speechBubble?: string | null;
-  tasksCompleted?: number;
-  sparkleAt?: number;
-}
-
-export interface LogEntry {
-  id: string;
-  timestamp: number;
-  message: string;
-  type: "info" | "system" | "mcp";
-}
-
-// Extended workstations for 8 potential agents
-export const WORKSTATIONS: Vec3[] = [
-  [-10, 0, -8],
-  [-12, 0, 4],
-  [-6, 0, 10],
-  [10, 0, -8],
-  [12, 0, 4],
-  [6, 0, 10],
-  [0, 0, 12],
-  [0, 0, -12],
-];
-
-export const DATA_HUB: Vec3 = [0, 0, 0];
-
-// Expanded ring for 8 agents
-export const HUB_RING: Vec3[] = [
-  [-3, 0, -3],
-  [3, 0, -3],
-  [-4, 0, 0],
-  [4, 0, 0],
-  [-3, 0, 3],
-  [3, 0, 3],
-  [0, 0, 4.5],
-  [0, 0, -4.5],
-];
-
-const baseAgents = [
-  { id: "ceo", name: "Karan", role: "CEO", color: "#f5c542" },
-  { id: "senior", name: "Senior Builder", role: "Full Stack", color: "#42a5f5" },
-  { id: "intern", name: "Intern Builder", role: "Full Stack", color: "#80deea" },
-  { id: "offer", name: "Offer Architect", role: "Strategy", color: "#ab47bc" },
-  { id: "growth", name: "Growth Hacker", role: "Growth", color: "#ef5350" },
-  { id: "funnel", name: "Funnel Engineer", role: "Funnel", color: "#66bb6a" },
-  { id: "designer", name: "Visual Designer", role: "Design", color: "#ec4899" },
-  { id: "deck_master", name: "Deck Master", role: "Presentation", color: "#f97316" },
-];
-
-const initialAgents: Agent[] = baseAgents.map((b, i) => ({
+const initialAgents: Agent[] = BASE_AGENTS.map((b, i) => ({
   ...b,
   status: "idle" as AgentStatus,
   position: WORKSTATIONS[i],
@@ -104,14 +49,7 @@ interface AgentStore {
   // --- Paperclip Patterns ---
   currentGoal: string;
   budget: { limit: number; spent: number };
-  activeIssues: { 
-    id: string; 
-    title: string; 
-    status: 'todo' | 'in_progress' | 'completed' | 'blocked' | 'reviewing'; 
-    assignee: string;
-    priority: 'low' | 'medium' | 'high';
-    reason?: string;
-  }[];
+  activeIssues: Issue[];
   deleteIssue: (id: string) => void;
   updateIssueStatus: (id: string, status: 'todo' | 'in_progress' | 'completed' | 'blocked' | 'reviewing', reason?: string) => void;
   inbox: { id: string; type: string; from: string; content: string; metadata?: any }[];
