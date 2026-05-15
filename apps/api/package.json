@@ -10,6 +10,15 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "hono": "^4.7.4",
+    "@repo/shared": "*",
+    "@repo/orchestrator": "*",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "wrangler": "^3.111.0",
+    "typescript": "^5.8.3",
+    "@cloudflare/workers-types": "^4.20250303.0"
+  }
 }

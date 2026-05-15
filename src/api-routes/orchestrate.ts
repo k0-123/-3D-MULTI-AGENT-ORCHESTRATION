@@ -35,7 +35,7 @@ export async function handleOrchestrateRequest(request: Request, env?: any): Pro
         return;
       }
 
-      for await (const update of runAgentStream(task, goal, env, body.useOpenDesign)) {
+      for await (const update of runAgentStream({ mission: task, useOpenDesign: body.useOpenDesign }, env)) {
         send({ ...update, issueId });  // attach issueId to every SSE event
       }
     } catch (err) {
@@ -151,7 +151,7 @@ export default defineEventHandler(async (event) => {
   req.on("close", () => { disconnected = true; });
 
   try {
-    for await (const update of runAgentStream(task, goal, undefined, body.useOpenDesign)) {
+    for await (const update of runAgentStream({ mission: task, useOpenDesign: body.useOpenDesign })) {
       if (disconnected) break;
       send({ ...update, issueId });
       await new Promise(r => setTimeout(r, 50));

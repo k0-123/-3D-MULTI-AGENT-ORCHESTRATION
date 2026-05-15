@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "multi-agent-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-04-03",
+  "observability": {
+    "enabled": true
+  }
+}

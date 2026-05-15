@@ -1,7 +1,16 @@
 import { agentGraph } from "./graph";
 import { AgentState } from "./state";
 
-export async function* runAgentStream(task: string, currentGoal: string, env?: any, useOpenDesign = false) {
+export interface OrchestrateOptions {
+  mission: string;
+  priority?: "low" | "medium" | "high";
+  mode?: "auto" | "manual";
+  designSystemId?: string;
+  useOpenDesign?: boolean;
+}
+
+export async function* runAgentStream(options: OrchestrateOptions, env?: any) {
+  const { mission: task, useOpenDesign = false } = options;
   const initial: AgentState = {
     task,
     messages: [],

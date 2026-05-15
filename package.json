@@ -18,10 +18,10 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@repo/shared": "workspace:*",
-    "@repo/orchestrator": "workspace:*",
-    "@repo/design-systems": "workspace:*",
-    "@repo/skills": "workspace:*"
+    "@repo/shared": "*",
+    "@repo/orchestrator": "*",
+    "@repo/design-systems": "*",
+    "@repo/skills": "*",
     "@cloudflare/vite-plugin": "^1.25.5",
     "@hookform/resolvers": "^5.2.2",
     "@langchain/community": "^1.1.28",

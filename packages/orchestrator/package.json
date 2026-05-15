@@ -14,9 +14,9 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/shared": "workspace:*",
-    "@repo/design-systems": "workspace:*",
-    "@repo/skills": "workspace:*",
+    "@repo/shared": "*",
+    "@repo/design-systems": "*",
+    "@repo/skills": "*",
     "@langchain/core": "^1.1.45",
     "@langchain/google-genai": "^2.1.30",
     "@langchain/groq": "^1.2.0",
