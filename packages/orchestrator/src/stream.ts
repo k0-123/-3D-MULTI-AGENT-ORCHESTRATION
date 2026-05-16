@@ -7,10 +7,11 @@ export interface OrchestrateOptions {
   mode?: "auto" | "manual";
   designSystemId?: string;
   useOpenDesign?: boolean;
+  userId?: string;
 }
 
 export async function* runAgentStream(options: OrchestrateOptions, env?: any) {
-  const { mission: task, useOpenDesign = false } = options;
+  const { mission: task, useOpenDesign = false, userId = null } = options;
   const initial: AgentState = {
     task,
     messages: [],
@@ -28,6 +29,8 @@ export async function* runAgentStream(options: OrchestrateOptions, env?: any) {
     useOpenDesign,
     activeDesignSystem: null,
     stepResults: {},
+    userId,
+    env,
   };
 
   try {

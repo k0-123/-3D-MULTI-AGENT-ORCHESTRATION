@@ -1,75 +1,77 @@
-# 3D Multi-Agent Orchestration Dashboard 🚀
+# 3D Multi-Agent Orchestration — Production Monorepo 🚀
 
 A high-performance, visual multi-agent orchestration engine built with **React 19**, **Three.js**, and **LangGraph**. This system transforms complex task execution into a visual 3D experience, coordinating a swarm of specialized AI agents to deliver professional-grade results.
 
-## ✨ Features
+## 🏗️ Architecture
 
-- **Visual 3D Orchestration**: Real-time visualization of agent activity within a stunning 3D HUD environment.
-- **Intelligent Swarm Architecture**: A hierarchy of specialized agents (CEO, Senior Builder, Growth Hacker, etc.) working in parallel.
-- **LangGraph Workflow Engine**: Robust state management and task routing using LangGraph for complex, multi-step missions.
-- **Adaptive Model Routing**: Dynamically routes tasks to the most efficient model (Gemini 1.5 Flash, Llama 3.3, MiniMax, GLM-4) based on complexity and cost.
-- **Persistent Agent Memory**: 
-  - **Night Cycles**: Agents reflect on past successes to extract optimization rules.
-  - **Morning Briefings**: Agents load learned rules into their context before starting work.
-- **Open Design Protocol**: Brand-aligned artifact generation with pre-defined design systems (Linear, Apple, Vercel, etc.).
-- **Live Deliverables**: Streaming results (HTML, Markdown) delivered directly to the dashboard with integrated live previews.
-- **GitHub & Search Integration**: Real-time access to repositories and the web for up-to-date execution.
+This project is organized as a high-performance monorepo using **Turborepo**:
+
+- **apps/web**: Pure Vite + React 19 SPA (Dashboard & 3D HUD).
+- **apps/api**: Hono backend running on Cloudflare Workers (SSE Orchestration).
+- **packages/orchestrator**: Standalone LangGraph agent engine.
+- **packages/ui**: Shared Radix UI + Tailwind CSS v4 component library.
+- **packages/shared**: Universal types, constants, and utilities.
+- **packages/design-systems**: 150+ professional design system definitions.
+- **packages/skills**: 107+ specialized agent skill definitions.
 
 ## 🛠️ Tech Stack
 
 - **Framework**: [React 19](https://react.dev/), [Vite](https://vitejs.dev/)
+- **API**: [Hono](https://hono.dev/) on [Cloudflare Workers](https://workers.cloudflare.com/)
 - **Orchestration**: [LangGraph](https://python.langchain.com/v0.1/docs/langgraph/), [LangChain](https://www.langchain.com/)
 - **3D Engine**: [Three.js](https://threejs.org/), [React Three Fiber](https://r3f.docs.pmnd.rs/)
-- **State Management**: [Zustand](https://github.com/pmndrs/zustand), [TanStack Query](https://tanstack.com/query)
-- **UI/UX**: [Tailwind CSS v4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/), [Radix UI](https://www.radix-ui.com/)
-- **Backend/Auth**: [Supabase](https://supabase.com/)
-- **Infrastructure**: [Cloudflare Workers/Pages](https://workers.cloudflare.com/)
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
+- **Database/Auth**: [Supabase](https://supabase.com/)
+- **Deployment**: [Cloudflare Pages](https://pages.cloudflare.com/) & [GitHub Actions](https://github.com/features/actions)
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (recommended) or Node.js
-- API Keys for: Google Gemini, Groq, OpenRouter, Supabase, Pinecone, and Tavily.
+- [Node.js 20+](https://nodejs.org/)
+- [npm](https://www.npmjs.com/) or [pnpm](https://pnpm.io/)
+- Cloudflare & Supabase accounts.
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/k0-123/agent-flow.git
-   cd agent-flow
+   git clone https://github.com/your-username/3d-agent-orch.git
+   cd 3d-agent-orch
    ```
 
 2. Install dependencies:
    ```bash
-   bun install
+   npm install --legacy-peer-deps
    ```
 
 3. Configure environment variables:
-   Create a `.env` file in the root and add your API keys.
+   - Copy `.env.example` to `.env`.
+   - Fill in your API keys for Gemini, Groq, OpenRouter, Supabase, etc.
 
-4. Start the development server:
-   ```bash
-   bun run dev
-   ```
+### Development
 
-## 🧠 Agent Roster
+Start all apps and packages in parallel:
+```bash
+npm run dev
+```
 
-- **CEO (Karan)**: Mission planning, roadmap creation, and quality assurance.
-- **Senior Builder**: Technical architecture and GitHub-ready code generation.
-- **Intern**: Support, documentation, and minor fixes.
-- **Offer Architect**: Business strategy and pricing models.
-- **Growth Hacker**: Viral strategies and marketing automation.
-- **Funnel Engineer**: Conversion optimization and landing pages.
-- **Designer**: UI/UX and visual asset creation.
+## 🧠 Deployment
 
-## 📂 Project Structure
+### Automated Deployment
+The project uses GitHub Actions (`.github/workflows/deploy.yml`) to automatically deploy to Cloudflare on every push to `main`.
 
-- `src/api-routes`: Server-side event-stream endpoints.
-- `src/components`: React components (UI & 3D).
-- `src/lib/agent-graph`: Core LangGraph orchestration logic.
-- `src/store`: Zustand global state management.
-- `src/worker`: Background agent execution logic.
+### Manual Deployment
+```bash
+# Build all workspaces
+npx turbo build
+
+# Deploy API
+cd apps/api && npx wrangler deploy
+
+# Deploy Web
+cd apps/web && npx wrangler pages deploy dist --project-name=3d-agent-orch
+```
 
 ---
 

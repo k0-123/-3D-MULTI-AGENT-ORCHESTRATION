@@ -2,8 +2,21 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "multi-agent-api",
   "main": "src/index.ts",
-  "compatibility_date": "2024-04-03",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": [ "nodejs_compat" ],
   "observability": {
     "enabled": true
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.md", "**/*.md?raw"],
+      "fallthrough": true
+    }
+  ],
+  "vars": {
+    "OPENAI_API_KEY": "fe_oa_aa8b8fdc72f3bd0d4f48727d896779099b860974baca4905",
+    "CODEX_API_KEY": "fe_oa_aa8b8fdc72f3bd0d4f48727d896779099b860974baca4905",
+    "OPENCODE_API_KEY": "sk-4iPvOhcUk4JKmWujjnrE3ZkLU6S6nUUkWg9HFeMPLAgiTL0da9tBvU0JlxW32W4S"
   }
 }

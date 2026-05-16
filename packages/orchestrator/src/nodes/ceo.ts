@@ -3,17 +3,24 @@ import { RoadmapStep, audit, sanitizeResponse } from "@repo/shared";
 import { AgentState } from "../state";
 import { resilientInvoke } from "../models/resilient-invoke";
 
+import { SKILLS_REGISTRY } from "@repo/skills";
+
 export async function ceoNode(state: AgentState): Promise<Partial<AgentState>> {
   console.log("[CEO] Designing Roadmap for:", state.task);
 
-  // Note: DESIGN_SYSTEMS will be moved to @repo/design-systems in Phase 3
-  // For now, we'll use a placeholder or import from old location if possible
-  // To keep it clean, we'll assume it's passed or simplified
+  const skillIds = SKILLS_REGISTRY.map(s => s.id).join(", ");
+  const agentIds = "ceo, senior, intern, offer, growth, funnel, designer, deck_master";
   const dsIndex = "Standard, Minimalist, Corporate, Cyberpunk, Neo-Brutalism"; 
 
   const systemPrompt = `You are the CEO Agent. Your job is to decompose a complex user request into a step-by-step roadmap for a team of specialized agents.
 
 MISSION GOAL: ${state.task}
+
+AVAILABLE AGENTS (ONLY USE THESE IDs):
+${agentIds}
+
+AVAILABLE SKILLS (ONLY USE THESE IDs):
+${skillIds}
 
 PARALLEL RULES:
 1. If steps can run independently, assign them the SAME GROUP (A, B, C).
@@ -29,7 +36,7 @@ TOOLS: search, github:read`;
   const { content, tokenCost } = await resilientInvoke([
     new SystemMessage(systemPrompt),
     new HumanMessage(state.task),
-  ], state, "glm");
+  ], state, "glm", state.env);
 
   const sanitized = sanitizeResponse(content);
   
@@ -40,7 +47,18 @@ TOOLS: search, github:read`;
   let roadmap: RoadmapStep[] = roadmapLines.map(line => {
     // Parsing logic...
     const parts = line.split(":");
-    const idPart = parts[0].replace(/^\d+\.\s*/, "").toLowerCase().trim();
+    let idPart = parts[0].replace(/^\d+\.\s*/, "").toLowerCase().trim();
+    
+    // Normalize IDs to match shared constants
+    if (idPart.includes("senior")) idPart = "senior";
+    else if (idPart.includes("intern")) idPart = "intern";
+    else if (idPart.includes("offer")) idPart = "offer";
+    else if (idPart.includes("growth")) idPart = "growth";
+    else if (idPart.includes("funnel")) idPart = "funnel";
+    else if (idPart.includes("designer")) idPart = "designer";
+    else if (idPart.includes("deck")) idPart = "deck_master";
+    else if (idPart.includes("ceo") || idPart.includes("karan")) idPart = "ceo";
+
     const taskWithSkill = parts.slice(1).join(":").trim();
     
     const skillMatch = taskWithSkill.match(/\(SKILL:\s*([\w-]+)/i);

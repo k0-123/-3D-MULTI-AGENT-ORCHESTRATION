@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 interface MemoryEntry {
   agent_id: string;
@@ -10,14 +10,15 @@ interface MemoryEntry {
 /**
  * Stores a memory for a specific agent in Supabase.
  */
-export async function storeMemory(content: string, agentId: string, task: string) {
+export async function storeMemory(content: string, agentId: string, task: string, userId?: string) {
   try {
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('agent_memory')
       .insert({
         agent_id: agentId,
         task: task,
         result: content.slice(0, 5000), // Cap size for free tier
+        user_id: userId,
       });
 
     if (error) {
@@ -40,12 +41,18 @@ export async function storeMemory(content: string, agentId: string, task: string
 /**
  * Retrieves memories for a specific task and agent from Supabase.
  */
-export async function retrieveMemory(task: string, agentId: string) {
+export async function retrieveMemory(task: string, agentId: string, userId?: string) {
   try {
-    const { data, error } = await supabase
+    let query = getSupabase()
       .from('agent_memory')
       .select('*')
-      .eq('agent_id', agentId)
+      .eq('agent_id', agentId);
+    
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -68,13 +75,13 @@ export async function retrieveMemory(task: string, agentId: string) {
         });
         return { ...m, score };
       })
-      .filter(m => m.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .filter((m: any) => m.score > 0)
+      .sort((a: any, b: any) => b.score - a.score)
       .slice(0, 1);
 
     if (relevant.length > 0) {
       console.log(`[Memory] Found relevant historical context for ${agentId} from Supabase`);
-      return relevant.map(m => `PAST SIMILAR TASK: ${m.task}\nPAST SUCCESSFUL RESULT:\n${m.result}`);
+      return relevant.map((m: any) => `PAST SIMILAR TASK: ${m.task}\nPAST SUCCESSFUL RESULT:\n${m.result}`);
     }
 
     return [];

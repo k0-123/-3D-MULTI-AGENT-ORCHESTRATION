@@ -19,6 +19,8 @@ export const AgentStateSchema = Annotation.Root({
   useOpenDesign: Annotation<boolean>({ reducer: (_, b) => b, default: () => false }),
   activeDesignSystem: Annotation<string | null>({ reducer: (_, b) => b, default: () => null }),
   stepResults: Annotation<Record<string, string>>({ reducer: (a, b) => ({ ...a, ...b }), default: () => ({}) }),
+  userId: Annotation<string | null>({ reducer: (_, b) => b, default: () => null }),
+  env: Annotation<any>({ reducer: (_, b) => b, default: () => ({}) }),
 });
 
 export type AgentState = typeof AgentStateSchema.State;

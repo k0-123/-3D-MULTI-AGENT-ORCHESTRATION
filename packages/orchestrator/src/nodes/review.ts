@@ -20,7 +20,7 @@ If it needs changes, respond with specific "FEEDBACK: [instructions]"`;
   const { content, tokenCost } = await resilientInvoke([
     new SystemMessage(systemPrompt),
     new HumanMessage("Review the output.")
-  ], state, "minimax");
+  ], state, "minimax", state.env);
 
   const sanitized = sanitizeResponse(content);
   const isApproved = sanitized.toUpperCase().includes("APPROVED");

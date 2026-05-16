@@ -23,11 +23,17 @@ export interface RoadmapStep {
   outputFormat?: "text" | "markdown" | "html";
 }
 
-export type OrchestrateEvent =
-  | { type: "roadmap"; data: RoadmapStep[] }
-  | { type: "agent_update"; data: AgentUpdate }
-  | { type: "budget_update"; data: Budget }
-  | { type: "log"; data: { message: string; type?: "info" | "system" | "mcp" } }
-  | { type: "step_complete"; data: { stepIndex: number; result: string } }
-  | { type: "mission_complete"; data: { result: string } }
-  | { type: "error"; data: { message: string } };
+/** Flat SSE event shape emitted by packages/orchestrator/src/stream.ts */
+export interface OrchestrateEvent {
+  agentId?: string;
+  targetAgentId?: string | null;
+  actionLog?: string;
+  newStatus?: AgentStatus;
+  auditLog?: string[];
+  budget?: Budget;
+  roadmap?: RoadmapStep[];
+  result?: string;
+  activeIssues?: any[];
+  status?: "completed" | "error";
+}
+

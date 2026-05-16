@@ -4,12 +4,13 @@ import { ChatOpenAI } from "@langchain/openai";
 
 let geminiFlash: ChatGoogleGenerativeAI | null = null;
 let groqLlama: ChatGroq | null = null;
-let openRouterMiniMax: ChatOpenAI | null = null;
-let openRouterGLM: ChatOpenAI | null = null;
 
-export function getGemini() {
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!geminiFlash && apiKey) {
+let openAIModel: ChatOpenAI | null = null;
+let codexModel: ChatOpenAI | null = null;
+
+export function getGemini(key?: string) {
+  const apiKey = key || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!geminiFlash && apiKey && apiKey !== "your_gemini_key_here") {
     geminiFlash = new ChatGoogleGenerativeAI({
       model: "gemini-1.5-flash",
       apiKey,
@@ -19,9 +20,9 @@ export function getGemini() {
   return geminiFlash;
 }
 
-export function getGroq() {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!groqLlama && apiKey) {
+export function getGroq(key?: string) {
+  const apiKey = key || process.env.GROQ_API_KEY;
+  if (!groqLlama && apiKey && apiKey !== "your_groq_key_here") {
     groqLlama = new ChatGroq({
       model: "llama-3.3-70b-versatile",
       apiKey,
@@ -31,28 +32,34 @@ export function getGroq() {
   return groqLlama;
 }
 
-export function getOpenRouterMiniMax() {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterMiniMax && apiKey) {
-    openRouterMiniMax = new ChatOpenAI({
-      modelName: "minimax/minimax-m2.5:free",
+
+export function getOpenAI(key?: string) {
+  const apiKey = key || process.env.OPENAI_API_KEY;
+  if (!openAIModel && apiKey && apiKey !== "your_openai_key_here") {
+    openAIModel = new ChatOpenAI({
+      model: "gpt-4o",
       apiKey,
-      configuration: { baseURL: "https://openrouter.ai/api/v1" },
+      configuration: { 
+        baseURL: "https://api.freemodel.dev/v1",
+      },
       maxTokens: 2048,
     });
   }
-  return openRouterMiniMax;
+  return openAIModel;
 }
 
-export function getOpenRouterGLM() {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterGLM && apiKey) {
-    openRouterGLM = new ChatOpenAI({
-      modelName: "z-ai/glm-4.5-air:free",
+export function getCodex(key?: string) {
+  const apiKey = key || process.env.CODEX_API_KEY;
+  if (!codexModel && apiKey && apiKey !== "your_codex_key_here") {
+    codexModel = new ChatOpenAI({
+      model: "gpt-4o",
       apiKey,
-      configuration: { baseURL: "https://openrouter.ai/api/v1" },
+      configuration: { 
+        baseURL: "https://api.freemodel.dev/v1",
+      },
       maxTokens: 2048,
     });
   }
-  return openRouterGLM;
+  return codexModel;
 }
+

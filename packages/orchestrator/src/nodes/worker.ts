@@ -31,7 +31,7 @@ export async function workerNode(state: AgentState): Promise<Partial<AgentState>
 
   let historicalContext = "";
   if (state.useOpenDesign) {
-    const memories = await retrieveMemory(currentStep.task, currentStep.agentId);
+    const memories = await retrieveMemory(currentStep.task, currentStep.agentId, state.userId || undefined);
     if (memories.length > 0) {
       historicalContext = memories.join("\n");
     }
@@ -50,6 +50,7 @@ export async function workerNode(state: AgentState): Promise<Partial<AgentState>
       designSystemId: state.activeDesignSystem || undefined,
       skillId: currentStep.skillId,
       agentPersona: `You are ${currentStep.agentId}, a specialist on a professional team.`,
+      includeBlueprints: currentStep.agentId === "designer",
       taskContext: `YOUR TASK: ${currentStep.task}\n\n${fewShot ? `EXAMPLE OF PERFECT WORK:\n${fewShot}\n\n` : ""}${historicalContext ? `HISTORY:\n${historicalContext}\n\n` : ""}${githubContext ? "GITHUB:\n" + githubContext : ""}\n${searchContext ? "SEARCH:\n" + searchContext : ""}`
     });
   }
@@ -57,13 +58,13 @@ export async function workerNode(state: AgentState): Promise<Partial<AgentState>
   // 3. Execution
   const { content, tokenCost } = await resilientInvoke([
     new HumanMessage(systemPrompt + "\n\nExecute the task now.")
-  ], state, currentStep.complexity === "fast" ? "minimax" : "glm");
+  ], state, currentStep.complexity === "fast" ? "minimax" : "glm", state.env);
 
   const sanitized = sanitizeResponse(content);
 
   // 4. Memory Persistence
   if (state.useOpenDesign && !isHtml) {
-    await storeMemory(sanitized, currentStep.agentId, currentStep.task);
+    await storeMemory(sanitized, currentStep.agentId, currentStep.task, state.userId || undefined);
   }
 
   return {

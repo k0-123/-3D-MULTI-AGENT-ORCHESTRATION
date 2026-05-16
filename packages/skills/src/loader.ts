@@ -1,18 +1,16 @@
-import { readFile } from "fs/promises";
-import { join } from "path";
+import { SKILL_REGISTRY } from "./index";
 
 /**
  * Loads a skill's markdown content by its ID.
- * @param skillId The directory name of the skill in src/lib/skills/
+ * @param skillId The directory name of the skill
  * @returns The full markdown content of the skill
  */
 export async function loadSkill(skillId: string): Promise<string> {
   try {
-    // In a production build with TanStack Start/Wrangler, 
-    // these files should be in the public or assets directory.
-    // For now, we assume we can read them from the local filesystem.
-    const skillPath = join(process.cwd(), "src", "lib", "skills", skillId, "SKILL.md");
-    const content = await readFile(skillPath, "utf-8");
+    const content = SKILL_REGISTRY[skillId];
+    if (!content) {
+      throw new Error(`Skill ${skillId} not found in registry`);
+    }
     return content;
   } catch (error) {
     console.error(`[SkillsLoader] Failed to load skill: ${skillId}`, error);
