@@ -119,5 +119,33 @@ export const BLUEPRINT_REGISTRY: Blueprint[] = [
     category: "cinematic",
     description: "Bottom blur overlay with CSS mask and blur-fade-up staggered animations.",
     filePath: "./16-movie-streaming.md"
+  },
+  {
+    id: "web3-immersive",
+    name: "Web3 Immersive Protocol",
+    category: "cinematic",
+    description: "Dark glowing neon vectors, floating glassmorphic panels, and WebGL-style ThreeJS canvas simulation.",
+    filePath: "./17-web3-immersive.md"
+  },
+  {
+    id: "saas-bento-grid",
+    name: "SaaS Bento Grid Pro",
+    category: "saas",
+    description: "Multi-layered bento grid with live interactive widgets, micro-charts, and sticky header.",
+    filePath: "./18-saas-bento-grid.md"
+  },
+  {
+    id: "ecommerce-lookbook",
+    name: "E-Commerce Immersive Lookbook",
+    category: "interactive",
+    description: "Horizontal scroll lookbook with magnetic cursor tracking, quick-view modals, and liquid-glass tags.",
+    filePath: "./19-ecommerce-lookbook.md"
+  },
+  {
+    id: "editorial-magazine",
+    name: "Editorial Serif Magazine",
+    category: "studio",
+    description: "High-contrast serif typography, asymmetric grid layouts, pull quotes, and sepia-toned grain overlay.",
+    filePath: "./20-editorial-magazine.md"
   }
 ];

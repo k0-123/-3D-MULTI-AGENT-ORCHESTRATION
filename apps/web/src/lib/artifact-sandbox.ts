@@ -12,4 +12,4 @@ export function revokeArtifactBlobUrl(url: string) {
   URL.revokeObjectURL(url);
 }
 
-export const ARTIFACT_CSP = "default-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; img-src * data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;";
+export const ARTIFACT_CSP = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://* http://*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://* http://*; style-src 'self' 'unsafe-inline' https://* http://*; img-src * data: blob:; media-src * data: blob:; font-src 'self' https://* http://*; connect-src *;";

@@ -53,10 +53,13 @@ export async function composePromptStack(layers: PromptLayers): Promise<string> 
   // Layer 4: Blueprint Library (NEW)
   if (layers.includeBlueprints) {
     const blueprints = getAllBlueprints();
-    stack.push("--- LAYER 4: PREMIUM DESIGN BLUEPRINTS ---");
-    stack.push("You have access to the following high-end design blueprints. SELECT ONE that fits the mission best.");
+    stack.push("--- LAYER 4: PREMIUM DESIGN BLUEPRINTS (ART DIRECTOR MODE) ---");
+    stack.push("You are acting as an elite Art Director. You have access to the following 20 high-end design blueprints. SELECT ONE that fits the mission best:");
     stack.push(blueprints.map(b => `- ${b.id}: ${b.name} (${b.description})`).join("\n"));
-    stack.push("\nYour goal is to ADAPT the selected blueprint to the user's specific mission data.");
+    stack.push("\nYour goal is to ADAPT the selected blueprint to the user's specific mission data. You MUST include:");
+    stack.push("1. Dynamic CSS variables and backdrop-filter blur utilities (e.g. .liquid-glass, .liquid-glass-strong).");
+    stack.push("2. Framer Motion entrance animations with premium easing curves: transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}.");
+    stack.push("3. High-fidelity SVG icon sets (Lucide/Material SVG paths) and word-by-word stagger animations (BlurText).");
   }
 
   // Layer 5: Agent Persona

@@ -43,7 +43,7 @@ export async function workerNode(state: AgentState): Promise<Partial<AgentState>
 
   if (isHtml) {
     const tokens = getTokensForSystem(state.activeDesignSystem);
-    systemPrompt = getHtmlPrompt(tokens, currentStep.task);
+    systemPrompt = getHtmlPrompt(tokens, `${state.reviewFeedback ? `CRITICAL REVISION REQUESTED BY CEO:\n${state.reviewFeedback}\n\n` : ""}YOUR TASK: ${currentStep.task}`);
   } else {
     const fewShot = (FEW_SHOT_EXAMPLES as any)[currentStep.agentId] || "";
     systemPrompt = await composePromptStack({
@@ -51,7 +51,7 @@ export async function workerNode(state: AgentState): Promise<Partial<AgentState>
       skillId: currentStep.skillId,
       agentPersona: `You are ${currentStep.agentId}, a specialist on a professional team.`,
       includeBlueprints: currentStep.agentId === "designer",
-      taskContext: `YOUR TASK: ${currentStep.task}\n\n${fewShot ? `EXAMPLE OF PERFECT WORK:\n${fewShot}\n\n` : ""}${historicalContext ? `HISTORY:\n${historicalContext}\n\n` : ""}${githubContext ? "GITHUB:\n" + githubContext : ""}\n${searchContext ? "SEARCH:\n" + searchContext : ""}`
+      taskContext: `${state.reviewFeedback ? `CRITICAL REVISION REQUESTED BY CEO:\n${state.reviewFeedback}\n\n` : ""}YOUR TASK: ${currentStep.task}\n\n${fewShot ? `EXAMPLE OF PERFECT WORK:\n${fewShot}\n\n` : ""}${historicalContext ? `HISTORY:\n${historicalContext}\n\n` : ""}${githubContext ? "GITHUB:\n" + githubContext : ""}\n${searchContext ? "SEARCH:\n" + searchContext : ""}`
     });
   }
 
